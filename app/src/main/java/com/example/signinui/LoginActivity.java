@@ -26,16 +26,20 @@ public class LoginActivity extends AppCompatActivity {
         etEmail = findViewById(R.id.etEmail);
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
-        btnGoToSign = findViewById(R.id.btnGoToSign);
+        btnGoToSign = findViewById(R.id.btnGoToSign); // Ensure this id exists in your layout
 
-        // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
+
+        if (mAuth.getCurrentUser() != null) {
+            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+            finish();
+            return;
+        }
 
         btnLogin.setOnClickListener(v -> {
             String email = etEmail.getText().toString().trim();
             String password = etPassword.getText().toString().trim();
 
-            // Validate inputs
             if (TextUtils.isEmpty(email)) {
                 etEmail.setError("Email is required");
                 etEmail.requestFocus();
@@ -57,7 +61,6 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            // Firebase sign in
             mAuth.signInWithEmailAndPassword(email, password)
                     .addOnCompleteListener(task -> {
                         if (task.isSuccessful()) {

@@ -46,11 +46,13 @@ dependencies {
     implementation libs.credentials
     implementation libs.credentials.play.services.auth
 
+
     // Test dependencies
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 
-
+    // M3
+    implementation(libs.material)
 
 }
