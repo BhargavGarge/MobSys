@@ -5,19 +5,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- Top Section (Logout Button) -->
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
 
-        <Button
-            android:id="@+id/btnLogout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Logout"
-            android:layout_alignParentEnd="true"
-            android:layout_margin="16dp"/>
-    </RelativeLayout>
+
 
     <!-- Fragment Container (Takes remaining space) -->
     <FrameLayout
