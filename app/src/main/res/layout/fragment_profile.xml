@@ -3,14 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorPrimary">
+   >
 
-    <!-- Blue Top Section (Fixed Height) -->
+    <!-- Updated top section to use gradient background instead of solid color -->
     <RelativeLayout
         android:id="@+id/top_section"
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        android:layout_alignParentTop="true">
+        android:layout_alignParentTop="true"
+        android:background="@drawable/gradient_header">
 
         <ImageView
             android:id="@+id/btnBack"

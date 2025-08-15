@@ -19,19 +19,7 @@ public class ProfileFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_profile, container, false);
-        // Handle back button press
-//        view.findViewById(R.id.btnBack).setOnClickListener(v -> {
-//            handleBackPressed();
-//        });
-//
-//        // Handle system back button press
-//        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),
-//                new OnBackPressedCallback(true) {
-//                    @Override
-//                    public void handleOnBackPressed() {
-//                        handleBackPressed();
-//                    }
-//                });
+
         //logout
         LinearLayout btnLogout = view.findViewById(R.id.logout); // Note: using logout_item not btnLogout
         btnLogout.setOnClickListener(v -> {
@@ -42,7 +30,5 @@ public class ProfileFragment extends Fragment {
 
         return view;
     }
-//    private void handleBackPressed() {
-//        Navigation.findNavController(requireView()).navigate(R.id.nav_home);
-//    }
+
 }
