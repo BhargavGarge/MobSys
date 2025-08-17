@@ -1,6 +1,7 @@
 package com.example.signinui;
 
 
+import android.app.Activity;
 import android.os.Bundle;
 
 
@@ -42,7 +43,12 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_search) {
                 selectedFragment = new SearchFragment();
             } else if (itemId == R.id.nav_profile) {
+
+                
                 selectedFragment = new ProfileFragment();
+            }
+            else if (itemId == R.id.nav_steps) {
+                selectedFragment = new StepCounterFragment();
             }
 
             if (selectedFragment != null) {
