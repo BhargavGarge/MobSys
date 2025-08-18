@@ -11,7 +11,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Header Section with Search -->
+        <!-- <CHANGE> Updated header to outdoor theme with location focus -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -39,21 +39,136 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Search"
+                    android:text="Explore Routes"
                     android:textColor="@android:color/white"
                     android:textSize="20sp"
                     android:textStyle="bold"
                     android:gravity="center" />
 
                 <ImageButton
-                    android:id="@+id/voice_search_btn"
+                    android:id="@+id/map_view_btn"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="@drawable/circle_background_transparent"
-                    android:src="@drawable/ic_mic"
+                    android:src="@drawable/ic_location"
                     app:tint="@android:color/white" />
 
             </LinearLayout>
+
+            <!-- Location Status Card -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/location_status_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="@android:color/white">
+
+                <LinearLayout
+                    android:id="@+id/location_permission_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="16dp"
+                    android:gravity="center_vertical"
+                    android:visibility="visible">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_location_off"
+                        app:tint="#FF5722" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Enable Location"
+                            android:textColor="#2C2C2C"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Find routes and trails near you"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/enable_location_btn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Enable"
+                        android:textColor="@android:color/white"
+                        android:background="@drawable/button_outdoor_primary"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/current_location_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="16dp"
+                    android:gravity="center_vertical"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_location"
+                        app:tint="#059669" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/current_location_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Current Location"
+                            android:textColor="#2C2C2C"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/location_address_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Getting your location..."
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <ImageButton
+                        android:id="@+id/refresh_location_btn"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@null"
+                        android:src="@drawable/ic_refresh"
+                        app:tint="#059669" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
 
             <!-- Enhanced Search Bar -->
             <LinearLayout
@@ -77,7 +192,7 @@
                     android:layout_marginStart="12dp"
                     android:layout_weight="1"
                     android:background="@null"
-                    android:hint="Search products, services, or anything..."
+                    android:hint="Search trails, routes, or destinations..."
                     android:textColor="#2C2C2C"
                     android:textColorHint="#999999"
                     android:textSize="16sp"
@@ -89,7 +204,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:background="@null"
-                    android:src="@drawable/ic_empty"
+                    android:src="@drawable/ic_clear"
                     app:tint="#666666"
                     android:visibility="gone" />
 
@@ -106,7 +221,7 @@
 
         </LinearLayout>
 
-        <!-- Search Filters -->
+        <!-- <CHANGE> Updated filters to outdoor activities -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -120,57 +235,48 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp">
 
-                <!-- Filter Chip 1 -->
+                <!-- Hiking Filter -->
                 <androidx.cardview.widget.CardView
-                    android:id="@+id/filter_all"
+                    android:id="@+id/filter_hiking"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
                     app:cardCornerRadius="20dp"
                     app:cardElevation="2dp"
-                    app:cardBackgroundColor="#2196F3">
+                    app:cardBackgroundColor="#059669">
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="All"
-                        android:textColor="@android:color/white"
-                        android:textSize="14sp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="8dp"
                         android:paddingBottom="8dp"
-                        android:background="?android:attr/selectableItemBackground" />
+                        android:background="?android:attr/selectableItemBackground">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_walk"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Hiking"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
 
                 </androidx.cardview.widget.CardView>
 
-                <!-- Filter Chip 2 -->
+                <!-- Cycling Filter -->
                 <androidx.cardview.widget.CardView
-                    android:id="@+id/filter_products"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="@android:color/white">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Products"
-                        android:textColor="#666666"
-                        android:textSize="14sp"
-                        android:paddingStart="16dp"
-                        android:paddingEnd="16dp"
-                        android:paddingTop="8dp"
-                        android:paddingBottom="8dp"
-                        android:background="?android:attr/selectableItemBackground" />
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Filter Chip 3 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/filter_services"
+                    android:id="@+id/filter_cycling"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
@@ -178,64 +284,111 @@
                     app:cardElevation="2dp"
                     app:cardBackgroundColor="@android:color/white">
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Services"
-                        android:textColor="#666666"
-                        android:textSize="14sp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="8dp"
                         android:paddingBottom="8dp"
-                        android:background="?android:attr/selectableItemBackground" />
+                        android:background="?android:attr/selectableItemBackground">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_cycling"
+                            app:tint="#666666" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Cycling"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
 
                 </androidx.cardview.widget.CardView>
 
-                <!-- Filter Chip 4 -->
+                <!-- Running Filter -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/filter_running"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="2dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp"
+                        android:background="?android:attr/selectableItemBackground">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_running"
+                            app:tint="#666666" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Running"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+
+
+                <!-- Nearby Filter -->
                 <androidx.cardview.widget.CardView
                     android:id="@+id/filter_nearby"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
                     app:cardCornerRadius="20dp"
                     app:cardElevation="2dp"
                     app:cardBackgroundColor="@android:color/white">
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Nearby"
-                        android:textColor="#666666"
-                        android:textSize="14sp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:paddingTop="8dp"
                         android:paddingBottom="8dp"
-                        android:background="?android:attr/selectableItemBackground" />
+                        android:background="?android:attr/selectableItemBackground">
 
-                </androidx.cardview.widget.CardView>
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_near_me"
+                            app:tint="#666666" />
 
-                <!-- Filter Chip 5 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/filter_popular"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="@android:color/white">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Nearby"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Popular"
-                        android:textColor="#666666"
-                        android:textSize="14sp"
-                        android:paddingStart="16dp"
-                        android:paddingEnd="16dp"
-                        android:paddingTop="8dp"
-                        android:paddingBottom="8dp"
-                        android:background="?android:attr/selectableItemBackground" />
+                    </LinearLayout>
 
                 </androidx.cardview.widget.CardView>
 
@@ -243,9 +396,9 @@
 
         </HorizontalScrollView>
 
-        <!-- Recent Searches Section -->
+        <!-- <CHANGE> Updated recent searches to recent routes -->
         <LinearLayout
-            android:id="@+id/recent_searches_section"
+            android:id="@+id/recent_routes_section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="16dp"
@@ -262,7 +415,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Recent Searches"
+                    android:text="Recent Routes"
                     android:textColor="#2C2C2C"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -279,15 +432,15 @@
 
             </LinearLayout>
 
-            <!-- Recent Search Items -->
+            <!-- Recent Route Items -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Recent Search 1 -->
+                <!-- Recent Route 1 -->
                 <LinearLayout
-                    android:id="@+id/recent_search_1"
+                    android:id="@+id/recent_route_1"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="?android:attr/selectableItemBackground"
@@ -296,22 +449,39 @@
                     android:padding="12dp">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_clock"
-                        app:tint="#999999" />
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/circle_background_hiking"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_walk"
+                        app:tint="@android:color/white" />
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:text="Wireless headphones"
-                        android:textColor="#2C2C2C"
-                        android:textSize="16sp" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Mountain Trail Loop"
+                            android:textColor="#2C2C2C"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="5.2 km • 2h 15m • Moderate"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
 
                     <ImageButton
-                        android:id="@+id/remove_search_1"
+                        android:id="@+id/remove_route_1"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:background="@null"
@@ -320,9 +490,9 @@
 
                 </LinearLayout>
 
-                <!-- Recent Search 2 -->
+                <!-- Recent Route 2 -->
                 <LinearLayout
-                    android:id="@+id/recent_search_2"
+                    android:id="@+id/recent_route_2"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="?android:attr/selectableItemBackground"
@@ -331,22 +501,39 @@
                     android:padding="12dp">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_clock"
-                        app:tint="#999999" />
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/circle_background_cycling"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_cycling"
+                        app:tint="@android:color/white" />
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:text="Coffee shops near me"
-                        android:textColor="#2C2C2C"
-                        android:textSize="16sp" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Riverside Cycling Path"
+                            android:textColor="#2C2C2C"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="12.8 km • 45m • Easy"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
 
                     <ImageButton
-                        android:id="@+id/remove_search_2"
+                        android:id="@+id/remove_route_2"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:background="@null"
@@ -355,9 +542,9 @@
 
                 </LinearLayout>
 
-                <!-- Recent Search 3 -->
+                <!-- Recent Route 3 -->
                 <LinearLayout
-                    android:id="@+id/recent_search_3"
+                    android:id="@+id/recent_route_3"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="?android:attr/selectableItemBackground"
@@ -366,22 +553,39 @@
                     android:padding="12dp">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_clock"
-                        app:tint="#999999" />
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/circle_background_running"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_running"
+                        app:tint="@android:color/white" />
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:text="Best restaurants"
-                        android:textColor="#2C2C2C"
-                        android:textSize="16sp" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="City Park Running Route"
+                            android:textColor="#2C2C2C"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="3.5 km • 18m • Easy"
+                            android:textColor="#666666"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
 
                     <ImageButton
-                        android:id="@+id/remove_search_3"
+                        android:id="@+id/remove_route_3"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:background="@null"
@@ -394,7 +598,7 @@
 
         </LinearLayout>
 
-        <!-- Search Results Section (Initially Hidden) -->
+        <!-- <CHANGE> Updated search results to show outdoor routes -->
         <LinearLayout
             android:id="@+id/search_results_section"
             android:layout_width="match_parent"
@@ -403,7 +607,8 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="16dp"
             android:orientation="vertical"
-            android:visibility="gone">
+            android:visibility="visible"
+           >
 
             <!-- Results Header -->
             <LinearLayout
@@ -418,7 +623,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Found 24 results"
+                    android:text="Found 18 routes"
                     android:textColor="#2C2C2C"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -436,7 +641,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Sort"
-                        android:textColor="#2196F3"
+                        android:textColor="#059669"
                         android:textSize="14sp" />
 
                     <ImageView
@@ -444,7 +649,7 @@
                         android:layout_height="16dp"
                         android:layout_marginStart="4dp"
                         android:src="@drawable/ic_sort"
-                        app:tint="#2196F3" />
+                        app:tint="#059669" />
 
                 </LinearLayout>
 
@@ -456,9 +661,9 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Search Result 1 -->
+                <!-- Route Result 1 -->
                 <androidx.cardview.widget.CardView
-                    android:id="@+id/search_result_1"
+                    android:id="@+id/route_result_1"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
@@ -473,13 +678,13 @@
                         android:padding="16dp">
 
                         <ImageView
-                            android:id="@+id/result_image_1"
+                            android:id="@+id/route_image_1"
                             android:layout_width="80dp"
                             android:layout_height="80dp"
-                            android:background="@drawable/circle_background_home"
-                            android:padding="16dp"
-                            android:src="@drawable/ic_placeholder"
-                            app:tint="#4CAF50" />
+                            android:background="@drawable/circle_background_hiking"
+                            android:padding="20dp"
+                            android:src="@drawable/ic_walk"
+                            app:tint="@android:color/white" />
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -489,20 +694,20 @@
                             android:orientation="vertical">
 
                             <TextView
-                                android:id="@+id/result_title_1"
+                                android:id="@+id/route_title_1"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Premium Wireless Headphones"
+                                android:text="Alpine Lake Trail"
                                 android:textColor="#2C2C2C"
                                 android:textSize="16sp"
                                 android:textStyle="bold" />
 
                             <TextView
-                                android:id="@+id/result_description_1"
+                                android:id="@+id/route_description_1"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="High-quality sound with noise cancellation"
+                                android:text="Beautiful mountain lake with scenic views"
                                 android:textColor="#666666"
                                 android:textSize="14sp" />
 
@@ -514,16 +719,139 @@
                                 android:orientation="horizontal">
 
                                 <TextView
-                                    android:id="@+id/result_price_1"
+                                    android:id="@+id/route_distance_1"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="$199.99"
-                                    android:textColor="#4CAF50"
-                                    android:textSize="16sp"
+                                    android:text="8.5 km"
+                                    android:textColor="#059669"
+                                    android:textSize="14sp"
                                     android:textStyle="bold" />
 
                                 <TextView
-                                    android:id="@+id/result_rating_1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="•"
+                                    android:textColor="#666666" />
+
+                                <TextView
+                                    android:id="@+id/route_difficulty_1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="Hard"
+                                    android:textColor="#FF5722"
+                                    android:textSize="14sp" />
+
+                                <TextView
+                                    android:id="@+id/route_rating_1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="12dp"
+                                    android:text="★ 4.7"
+                                    android:textColor="#FF9800"
+                                    android:textSize="14sp" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <ImageButton
+                            android:id="@+id/favorite_route_1"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@null"
+                            android:src="@drawable/ic_fav_border"
+                            app:tint="#999999" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Route Result 2 -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/route_result_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:id="@+id/route_image_2"
+                            android:layout_width="80dp"
+                            android:layout_height="80dp"
+                            android:background="@drawable/circle_background_cycling"
+                            android:padding="20dp"
+                            android:src="@drawable/ic_cycling"
+                            app:tint="@android:color/white" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/route_title_2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Coastal Bike Route"
+                                android:textColor="#2C2C2C"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/route_description_2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Scenic coastal path with ocean views"
+                                android:textColor="#666666"
+                                android:textSize="14sp" />
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:id="@+id/route_distance_2"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="15.2 km"
+                                    android:textColor="#059669"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="•"
+                                    android:textColor="#666666" />
+
+                                <TextView
+                                    android:id="@+id/route_difficulty_2"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="Moderate"
+                                    android:textColor="#FF9800"
+                                    android:textSize="14sp" />
+
+                                <TextView
+                                    android:id="@+id/route_rating_2"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="12dp"
@@ -536,189 +864,7 @@
                         </LinearLayout>
 
                         <ImageButton
-                            android:id="@+id/favorite_btn_1"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:background="@null"
-                            android:src="@drawable/ic_fav_border"
-                            app:tint="#999999" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Search Result 2 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/search_result_2"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="3dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
-
-                        <ImageView
-                            android:id="@+id/result_image_2"
-                            android:layout_width="80dp"
-                            android:layout_height="80dp"
-                            android:background="@drawable/circle_background_home"
-                            android:padding="16dp"
-                            android:src="@drawable/ic_placeholder"
-                            app:tint="#2196F3" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/result_title_2"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Coffee Bean Café"
-                                android:textColor="#2C2C2C"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/result_description_2"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="Artisan coffee and fresh pastries • 0.5 mi"
-                                android:textColor="#666666"
-                                android:textSize="14sp" />
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:id="@+id/result_status_2"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Open now"
-                                    android:textColor="#4CAF50"
-                                    android:textSize="14sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/result_rating_2"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="12dp"
-                                    android:text="★ 4.8"
-                                    android:textColor="#FF9800"
-                                    android:textSize="14sp" />
-
-                            </LinearLayout>
-
-                        </LinearLayout>
-
-                        <ImageButton
-                            android:id="@+id/favorite_btn_2"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:background="@null"
-                            android:src="@drawable/ic_fav_border"
-                            app:tint="#999999" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Search Result 3 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/search_result_3"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="3dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
-
-                        <ImageView
-                            android:id="@+id/result_image_3"
-                            android:layout_width="80dp"
-                            android:layout_height="80dp"
-                            android:background="@drawable/circle_background_home"
-                            android:padding="16dp"
-                            android:src="@drawable/ic_placeholder"
-                            app:tint="#FF9800" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/result_title_3"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Bella Vista Restaurant"
-                                android:textColor="#2C2C2C"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/result_description_3"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="Italian cuisine with outdoor seating • 1.2 mi"
-                                android:textColor="#666666"
-                                android:textSize="14sp" />
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:id="@+id/result_price_range_3"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="$$"
-                                    android:textColor="#666666"
-                                    android:textSize="14sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/result_rating_3"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="12dp"
-                                    android:text="★ 4.3"
-                                    android:textColor="#FF9800"
-                                    android:textSize="14sp" />
-
-                            </LinearLayout>
-
-                        </LinearLayout>
-
-                        <ImageButton
-                            android:id="@+id/favorite_btn_3"
+                            android:id="@+id/favorite_route_2"
                             android:layout_width="32dp"
                             android:layout_height="32dp"
                             android:background="@null"
@@ -733,46 +879,7 @@
 
         </LinearLayout>
 
-        <!-- No Results State (Initially Hidden) -->
-        <LinearLayout
-            android:id="@+id/no_results_section"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="32dp"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
 
-            <ImageView
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:src="@drawable/ic_empty"
-                app:tint="#CCCCCC" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="No results found"
-                android:textColor="#2C2C2C"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:text="Try adjusting your search or filters\nto find what you're looking for"
-                android:textColor="#666666"
-                android:textSize="16sp" />
-
-        </LinearLayout>
-
-        <!-- Bottom Padding for Navigation -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="80dp" />
 
     </LinearLayout>
 
