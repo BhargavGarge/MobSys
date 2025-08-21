@@ -35,7 +35,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Explore Routes Map Google"
+                android:text="Explore Routes "
                 android:textColor="@android:color/white"
                 android:textSize="20sp"
                 android:textStyle="bold"
@@ -113,7 +113,7 @@
             android:name="com.google.android.gms.maps.SupportMapFragment"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            
+
 
             />
 
