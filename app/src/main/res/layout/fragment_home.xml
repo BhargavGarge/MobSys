@@ -263,50 +263,7 @@
                 </LinearLayout>
 
                 <!-- Quick Search -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="32dp"
-                    app:cardCornerRadius="25dp"
-                    app:cardElevation="8dp"
-                    app:cardBackgroundColor="#FFFFFF">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_search"
-                            app:tint="#059669" />
-
-                        <EditText
-                            android:id="@+id/hero_search"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:background="@null"
-                            android:hint="Discover trails, peaks, adventures..."
-                            android:textColor="#475569"
-                            android:textColorHint="#94A3B8"
-                            android:textSize="16sp" />
-
-                        <ImageButton
-                            android:id="@+id/voice_search_hero"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:background="?android:attr/selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_mic"
-                            app:tint="#10B981" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
 
             </LinearLayout>
 

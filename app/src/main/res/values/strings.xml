@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">SignInUI</string>
-    <string name="client_id">682260136233-rsqrmemhqqa23r6vrjeorsipmnhce5j8.apps.googleusercontent.com</string>
+    <string name="map_api">AIzaSyBa95Bo89ux9-6KDvt7f_qKkjBib_t4vuA</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="title_activity_maps">MapsActivity</string>
 </resources>

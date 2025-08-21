@@ -40,8 +40,8 @@ public class MainActivity extends AppCompatActivity {
             int itemId = item.getItemId();
             if (itemId == R.id.nav_home) {
                 selectedFragment = new HomeFragment();
-            } else if (itemId == R.id.nav_search) {
-                selectedFragment = new SearchFragment();
+            } else if (itemId == R.id.nav_routes) {
+                selectedFragment = new MapsFragment();
             } else if (itemId == R.id.nav_profile) {
 
                 
