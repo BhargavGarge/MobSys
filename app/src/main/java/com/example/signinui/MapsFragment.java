@@ -15,6 +15,9 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -61,6 +64,7 @@ public class MapsFragment extends Fragment {
     private MapView mapView;
     private MyLocationNewOverlay myLocationOverlay;
     private FusedLocationProviderClient fusedLocationClient;
+    private Spinner trailTypeSpinner;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -68,6 +72,11 @@ public class MapsFragment extends Fragment {
             .build();
 
     private final Gson gson = new Gson();
+
+    // Add filter variables
+    private String currentFilter = "all"; // "all", "hiking", "running", "cycling"
+    private final List<Polyline> allTrailLines = new ArrayList<>();
+    private final List<Marker> allTrailMarkers = new ArrayList<>();
 
     private final ActivityResultLauncher<String[]> requestPermissionsLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> {
@@ -104,11 +113,130 @@ public class MapsFragment extends Fragment {
         // Overlays
         addMapOverlays();
 
+        // Setup trail type spinner
+        setupTrailTypeSpinner(view);
+
         // Check services and request permissions
         checkLocationServices();
         requestLocationPermissionIfNeeded();
 
         return view;
+    }
+
+    private void setupTrailTypeSpinner(View view) {
+        trailTypeSpinner = view.findViewById(R.id.trail_type_spinner);
+
+        // Create an ArrayAdapter using the string array and a default spinner layout
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                requireContext(),
+                R.array.trail_types_array,
+                android.R.layout.simple_spinner_item
+        );
+
+        // Specify the layout to use when the list of choices appears
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        // Apply the adapter to the spinner
+        trailTypeSpinner.setAdapter(adapter);
+
+        // Set spinner item selection listener
+        trailTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedItem = parent.getItemAtPosition(position).toString();
+                applyFilterFromSpinner(selectedItem);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // Do nothing
+            }
+        });
+    }
+
+    private void applyFilterFromSpinner(String selectedItem) {
+        switch (selectedItem) {
+            case "All Trail Types":
+                applyFilter("all");
+                break;
+            case "Hiking Trails":
+                applyFilter("hiking");
+                break;
+            case "Running Trails":
+                applyFilter("running");
+                break;
+            case "Cycling Trails":
+                applyFilter("cycling");
+                break;
+            default:
+                applyFilter("all");
+                break;
+        }
+    }
+
+    private void applyFilter(String filterType) {
+        currentFilter = filterType;
+        filterTrails();
+        Toast.makeText(requireContext(), "Showing " + filterType + " trails", Toast.LENGTH_SHORT).show();
+    }
+
+    private void filterTrails() {
+        // Clear all existing trail overlays (except user location)
+        List<Polyline> linesToRemove = new ArrayList<>();
+        List<Marker> markersToRemove = new ArrayList<>();
+
+        for (org.osmdroid.views.overlay.Overlay overlay : mapView.getOverlays()) {
+            if (overlay instanceof Polyline) {
+                linesToRemove.add((Polyline) overlay);
+            } else if (overlay instanceof Marker && overlay != myLocationOverlay) {
+                markersToRemove.add((Marker) overlay);
+            }
+        }
+
+        for (Polyline line : linesToRemove) {
+            mapView.getOverlays().remove(line);
+        }
+
+        for (Marker marker : markersToRemove) {
+            mapView.getOverlays().remove(marker);
+        }
+
+        // Add back only the trails that match the current filter
+        for (Polyline line : allTrailLines) {
+            String snippet = line.getSnippet();
+            if (snippet != null) {
+                String trailType = snippet.replace("Type: ", "");
+
+                if (currentFilter.equals("all") ||
+                        (currentFilter.equals("hiking") && (trailType.equals("footway") || trailType.equals("path"))) ||
+                        (currentFilter.equals("running") && trailType.equals("track")) ||
+                        (currentFilter.equals("cycling") && trailType.equals("cycleway"))) {
+                    mapView.getOverlays().add(line);
+                }
+            }
+        }
+
+        // Add back only the markers that match the current filter
+        for (Marker marker : allTrailMarkers) {
+            String subDescription = marker.getSubDescription();
+            if (subDescription != null) {
+                if (currentFilter.equals("all") ||
+                        (currentFilter.equals("hiking") && subDescription.toLowerCase().contains("hiking")) ||
+                        (currentFilter.equals("running") && subDescription.toLowerCase().contains("running")) ||
+                        (currentFilter.equals("cycling") && subDescription.toLowerCase().contains("cycling"))) {
+                    mapView.getOverlays().add(marker);
+                }
+            }
+        }
+
+        // Make sure user location overlay stays
+        if (myLocationOverlay != null) {
+            mapView.getOverlays().remove(myLocationOverlay);
+            mapView.getOverlays().add(0, myLocationOverlay);
+        }
+
+        // Refresh the map
+        mapView.invalidate();
     }
 
     private void addMapOverlays() {
@@ -357,7 +485,17 @@ public class MapsFragment extends Fragment {
                     return true;
                 });
 
-                mapView.getOverlays().add(m);
+                // Store the marker for filtering
+                allTrailMarkers.add(m);
+
+                // Add to map if it matches current filter
+                if (currentFilter.equals("all") ||
+                        (currentFilter.equals("hiking") && category.toLowerCase().contains("hiking")) ||
+                        (currentFilter.equals("running") && category.toLowerCase().contains("running")) ||
+                        (currentFilter.equals("cycling") && category.toLowerCase().contains("cycling"))) {
+                    mapView.getOverlays().add(m);
+                }
+
                 fetchTrailsFromOverpass(lat, lon);
             } catch (Exception e) {
                 Log.e(TAG, "Error processing place result", e);
@@ -397,7 +535,7 @@ public class MapsFragment extends Fragment {
                     JsonArray elements = json.getAsJsonArray("elements");
                     if (elements == null) return;
 
-                    List<Polyline> polylines = new ArrayList<>();
+                    List<Polyline> newPolylines = new ArrayList<>();
 
                     for (JsonElement el : elements) {
                         JsonObject way = el.getAsJsonObject();
@@ -422,19 +560,19 @@ public class MapsFragment extends Fragment {
                             case "footway":
                             case "path":
                                 // Brown for hiking/walking paths 🚶
-                                trailColor = Color.parseColor("#8B4513"); // SaddleBrown
+                                trailColor = Color.parseColor("#000080");
                                 break;
                             case "track":
                                 // Blue for wider tracks, good for running 🏃
-                                trailColor = Color.parseColor("#4169E1"); // RoyalBlue
+                                trailColor = Color.parseColor("#FF0000");
                                 break;
                             case "cycleway":
                                 // Purple for dedicated cycle paths 🚲
-                                trailColor = Color.parseColor("#9932CC"); // DarkOrchid
+                                trailColor = Color.parseColor("#9932CC");
                                 break;
                             default:
                                 // Dark Gray for any other type
-                                trailColor = Color.parseColor("#2F4F4F"); // DarkSlateGray
+                                trailColor = Color.parseColor("#2F4F4F");
                                 break;
                         }
 
@@ -452,11 +590,26 @@ public class MapsFragment extends Fragment {
                             return true;
                         });
 
-                        polylines.add(line);
+                        // Store the polyline for filtering
+                        allTrailLines.add(line);
+                        newPolylines.add(line);
                     }
 
                     requireActivity().runOnUiThread(() -> {
-                        mapView.getOverlays().addAll(polylines);
+                        // Add to map if it matches current filter
+                        for (Polyline line : newPolylines) {
+                            String snippet = line.getSnippet();
+                            if (snippet != null) {
+                                String trailType = snippet.replace("Type: ", "");
+
+                                if (currentFilter.equals("all") ||
+                                        (currentFilter.equals("hiking") && (trailType.equals("footway") || trailType.equals("path"))) ||
+                                        (currentFilter.equals("running") && trailType.equals("track")) ||
+                                        (currentFilter.equals("cycling") && trailType.equals("cycleway"))) {
+                                    mapView.getOverlays().add(line);
+                                }
+                            }
+                        }
                         mapView.invalidate();
                     });
                 } catch (Exception ex) {

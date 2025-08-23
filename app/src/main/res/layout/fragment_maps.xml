@@ -55,7 +55,6 @@
 
             </LinearLayout>
 
-
             <!-- Enhanced Search Bar -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -107,8 +106,7 @@
 
         </LinearLayout>
 
-        <!-- Added comprehensive filter system with activity dropdown and advanced filters -->
-        <!-- Activity Type Dropdown and Advanced Filters -->
+        <!-- Trail Type Dropdown Selector -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -117,98 +115,36 @@
             android:layout_marginEnd="16dp"
             android:orientation="vertical">
 
-            <!-- Activity Type Dropdown and Filter Button Row -->
+            <!-- Trail Type Dropdown -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp">
 
-                <!-- Activity Type Dropdown -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/activity_dropdown_card"
-                    android:layout_width="0dp"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="12dp"
+                    android:text="Select Trail Type"
+                    android:textColor="#2C2C2C"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="2dp"
                     app:cardBackgroundColor="@android:color/white">
 
-                    <LinearLayout
-                        android:id="@+id/activity_dropdown_btn"
+                    <Spinner
+                        android:id="@+id/trail_type_spinner"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
                         android:padding="16dp"
-                        android:background="?android:attr/selectableItemBackground">
-
-                        <ImageView
-                            android:id="@+id/selected_activity_icon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_hiking"
-                            app:tint="#059669" />
-
-                        <TextView
-                            android:id="@+id/selected_activity_text"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="12dp"
-                            android:text="Hiking"
-                            android:textColor="#2C2C2C"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_arrow_drop_down"
-                            app:tint="#666666" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Advanced Filter Button -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/advanced_filter_btn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="#059669">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="16dp"
-                        android:paddingEnd="16dp"
-                        android:paddingTop="16dp"
-                        android:paddingBottom="16dp"
-                        android:background="?android:attr/selectableItemBackground">
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_tune"
-                            app:tint="@android:color/white" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:text="Filters"
-                            android:textColor="@android:color/white"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
+                        android:background="@android:color/transparent"
+                        android:spinnerMode="dropdown" />
 
                 </androidx.cardview.widget.CardView>
 
