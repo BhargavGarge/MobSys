@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:weightSum="4"
-    android:background="@color/colorPrimary"
+    android:background="@drawable/gradient_header"
 
 
    >
@@ -180,7 +180,7 @@
                 android:id="@+id/btnGoToSign"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/colorPrimary"
+                android:textColor="@color/green"
                 android:textSize="18dp"
                 android:text="Sign In"
                 android:fontFamily="@font/segoe_ui_bold"

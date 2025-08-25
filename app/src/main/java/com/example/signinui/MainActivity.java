@@ -44,7 +44,7 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new MapsFragment();
             } else if (itemId == R.id.nav_profile) {
 
-                
+
                 selectedFragment = new ProfileFragment();
             }
             else if (itemId == R.id.nav_steps) {
