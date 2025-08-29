@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">SignInUI</string>
     <string name="map_api">AIzaSyBa95Bo89ux9-6KDvt7f_qKkjBib_t4vuA</string>
+    <string name="ors_api_key">eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjkwNjRmMWI5OTFlMjQyOTc4Zjc1MDE4ZWZiNjZkNjU3IiwiaCI6Im11cm11cjY0In0=</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="title_activity_maps">MapsActivity</string>

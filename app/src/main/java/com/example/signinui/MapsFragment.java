@@ -8,16 +8,21 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Looper;
 import android.preference.PreferenceManager;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,10 +30,14 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 import com.google.gson.Gson;
@@ -53,6 +62,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -63,42 +73,53 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class MapsFragment extends Fragment {
+public class MapsFragment extends Fragment implements TextToSpeech.OnInitListener {
 
     private static final String TAG = "MapsFragment";
     private MapView mapView;
     private MyLocationNewOverlay myLocationOverlay;
     private FusedLocationProviderClient fusedLocationClient;
     private Spinner trailTypeSpinner;
-
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
-
     private final Gson gson = new Gson();
 
-    // Add filter variables
-    private String currentFilter = "all"; // "all", "hiking", "running", "cycling"
+    // Filter variables
+    private String currentFilter = "all";
     private final List<Polyline> allTrailLines = new ArrayList<>();
     private final List<Marker> allTrailMarkers = new ArrayList<>();
-
-    // Store trail details for enhanced information
     private final Map<String, TrailDetails> trailDetailsMap = new HashMap<>();
 
-    // Inner class to store trail details
-    private static class TrailDetails {
-        String name;
-        String description;
-        String difficulty;
-        String distance;
-        String elevation;
-        String type;
-        double rating;
-        String location;
+    // Navigation related variables
+    private boolean isNavigating = false;
+    private NavigationData currentNavigation = null;
+    private TextToSpeech textToSpeech;
+    private LocationCallback navigationLocationCallback;
 
-        TrailDetails(String name, String description, String difficulty, String distance,
-                     String elevation, String type, double rating, String location) {
+    // Navigation UI elements
+    private CardView navigationPanel;
+    private TextView navigationInstruction;
+    private TextView distanceToNext;
+    private TextView remainingDistance;
+    private TextView estimatedTime;
+    private ProgressBar navigationProgress;
+    private Button stopNavigationButton;
+
+    // Current location tracking for navigation
+    private GeoPoint lastKnownLocation;
+    private Polyline navigationRoute;
+    private List<NavigationStep> navigationSteps;
+    private int currentStepIndex = 0;
+
+    // Data classes
+    private static class TrailDetails {
+        String name, description, difficulty, distance, elevation, type, location;
+        double rating;
+        List<GeoPoint> routePoints;
+
+        TrailDetails(String name, String description, String difficulty, String distance, String elevation, String type, double rating, String location) {
             this.name = name;
             this.description = description;
             this.difficulty = difficulty;
@@ -107,6 +128,34 @@ public class MapsFragment extends Fragment {
             this.type = type;
             this.rating = rating;
             this.location = location;
+            this.routePoints = new ArrayList<>();
+        }
+    }
+
+    private static class NavigationData {
+        String trailName, trailType;
+        List<GeoPoint> routePoints;
+        double totalDistance;
+
+        NavigationData(String trailName, List<GeoPoint> routePoints, String trailType, double totalDistance) {
+            this.trailName = trailName;
+            this.routePoints = routePoints;
+            this.trailType = trailType;
+            this.totalDistance = totalDistance;
+        }
+    }
+
+    private static class NavigationStep {
+        GeoPoint point;
+        String instruction;
+        double distance;
+        String direction;
+
+        NavigationStep(GeoPoint point, String instruction, double distance, String direction) {
+            this.point = point;
+            this.instruction = instruction;
+            this.distance = distance;
+            this.direction = direction;
         }
     }
 
@@ -114,12 +163,10 @@ public class MapsFragment extends Fragment {
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> {
                 if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
                         permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)) {
-                    Log.d(TAG, "Location permission granted");
-                    // Permissions granted, now find location
                     enableMyLocationOverlay();
                     findAndCenterOnUserLocation();
                 } else {
-                    Toast.makeText(requireContext(), "Location permission denied. Cannot show your location.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(requireContext(), "Location permission denied.", Toast.LENGTH_LONG).show();
                 }
             });
 
@@ -134,76 +181,85 @@ public class MapsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_maps, container, false);
         mapView = view.findViewById(R.id.map);
 
+        textToSpeech = new TextToSpeech(requireContext(), this);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
 
-        // Basic OSMdroid setup
-        mapView.setTileSource(TileSourceFactory.MAPNIK);
+        // *** ENHANCEMENT: Use a topographic map style for an outdoor feel ***
+        mapView.setTileSource(TileSourceFactory.OpenTopo);
         mapView.setMultiTouchControls(true);
-        mapView.getController().setCenter(new GeoPoint(51.1657, 10.4515)); // Germany center
+        mapView.getController().setCenter(new GeoPoint(51.1657, 10.4515));
         mapView.getController().setZoom(8.0);
 
-        // Overlays
+        initNavigationUI(view);
         addMapOverlays();
-
-        // Setup trail type spinner
         setupTrailTypeSpinner(view);
-
-        // Check services and request permissions
         checkLocationServices();
         requestLocationPermissionIfNeeded();
 
         return view;
     }
 
+    private void initNavigationUI(View view) {
+        navigationPanel = view.findViewById(R.id.navigation_panel);
+        navigationInstruction = view.findViewById(R.id.navigation_instruction);
+        distanceToNext = view.findViewById(R.id.distance_to_next);
+        remainingDistance = view.findViewById(R.id.remaining_distance);
+        estimatedTime = view.findViewById(R.id.estimated_time);
+        navigationProgress = view.findViewById(R.id.navigation_progress);
+        stopNavigationButton = view.findViewById(R.id.stop_navigation_button);
+        if (stopNavigationButton != null) {
+            stopNavigationButton.setOnClickListener(v -> stopNavigation());
+        }
+        if (navigationPanel != null) {
+            navigationPanel.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            int result = textToSpeech.setLanguage(Locale.getDefault());
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.w(TAG, "TTS Language not supported");
+            }
+        } else {
+            Log.e(TAG, "TTS initialization failed");
+        }
+    }
+
     private void setupTrailTypeSpinner(View view) {
         trailTypeSpinner = view.findViewById(R.id.trail_type_spinner);
-
-        // Create an ArrayAdapter using the string array and a default spinner layout
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
-                requireContext(),
-                R.array.trail_types_array,
-                android.R.layout.simple_spinner_item
-        );
-
-        // Specify the layout to use when the list of choices appears
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(requireContext(), R.array.trail_types_array, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-
-        // Apply the adapter to the spinner
         trailTypeSpinner.setAdapter(adapter);
-
-        // Set spinner item selection listener
         trailTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String selectedItem = parent.getItemAtPosition(position).toString();
-                applyFilterFromSpinner(selectedItem);
+                applyFilterFromSpinner(parent.getItemAtPosition(position).toString());
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                // Do nothing
-            }
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
 
     private void applyFilterFromSpinner(String selectedItem) {
+        String filter;
         switch (selectedItem) {
-            case "All Trail Types":
-                applyFilter("all");
-                break;
             case "Hiking Trails":
-                applyFilter("hiking");
+                filter = "hiking";
                 break;
             case "Running Trails":
-                applyFilter("running");
+                filter = "running";
                 break;
             case "Cycling Trails":
-                applyFilter("cycling");
+                filter = "cycling";
                 break;
             default:
-                applyFilter("all");
+                filter = "all";
                 break;
         }
+        applyFilter(filter);
     }
 
     private void applyFilter(String filterType) {
@@ -213,62 +269,61 @@ public class MapsFragment extends Fragment {
     }
 
     private void filterTrails() {
-        // Clear all existing trail overlays (except user location)
-        List<Polyline> linesToRemove = new ArrayList<>();
-        List<Marker> markersToRemove = new ArrayList<>();
+        List<org.osmdroid.views.overlay.Overlay> overlaysToKeep = new ArrayList<>();
+        if (myLocationOverlay != null) overlaysToKeep.add(myLocationOverlay);
+        if (navigationRoute != null) overlaysToKeep.add(navigationRoute);
 
-        for (org.osmdroid.views.overlay.Overlay overlay : mapView.getOverlays()) {
-            if (overlay instanceof Polyline) {
-                linesToRemove.add((Polyline) overlay);
-            } else if (overlay instanceof Marker && overlay != myLocationOverlay) {
-                markersToRemove.add((Marker) overlay);
+        mapView.getOverlays().retainAll(overlaysToKeep);
+
+        for (Marker marker : allTrailMarkers) {
+            String subDescription = marker.getSubDescription();
+            if (shouldShowMarker(subDescription)) {
+                mapView.getOverlays().add(marker);
             }
         }
 
-        for (Polyline line : linesToRemove) {
-            mapView.getOverlays().remove(line);
-        }
-
-        for (Marker marker : markersToRemove) {
-            mapView.getOverlays().remove(marker);
-        }
-
-        // Add back only the trails that match the current filter
         for (Polyline line : allTrailLines) {
             String snippet = line.getSnippet();
-            if (snippet != null) {
-                String trailType = snippet.replace("Type: ", "");
-
-                if (currentFilter.equals("all") ||
-                        (currentFilter.equals("hiking") && (trailType.equals("footway") || trailType.equals("path"))) ||
-                        (currentFilter.equals("running") && trailType.equals("track")) ||
-                        (currentFilter.equals("cycling") && trailType.equals("cycleway"))) {
+            if (snippet != null && snippet.startsWith("Type: ")) {
+                String trailType = snippet.replace("Type: ", "").toLowerCase();
+                if (shouldShowPolyline(trailType)) {
                     mapView.getOverlays().add(line);
                 }
             }
         }
-
-        // Add back only the markers that match the current filter
-        for (Marker marker : allTrailMarkers) {
-            String subDescription = marker.getSubDescription();
-            if (subDescription != null) {
-                if (currentFilter.equals("all") ||
-                        (currentFilter.equals("hiking") && subDescription.toLowerCase().contains("hiking")) ||
-                        (currentFilter.equals("running") && subDescription.toLowerCase().contains("running")) ||
-                        (currentFilter.equals("cycling") && subDescription.toLowerCase().contains("cycling"))) {
-                    mapView.getOverlays().add(marker);
-                }
-            }
-        }
-
-        // Make sure user location overlay stays
-        if (myLocationOverlay != null) {
-            mapView.getOverlays().remove(myLocationOverlay);
-            mapView.getOverlays().add(0, myLocationOverlay);
-        }
-
-        // Refresh the map
         mapView.invalidate();
+    }
+
+    private boolean shouldShowMarker(String category) {
+        if (category == null) return currentFilter.equals("all");
+        String lc = category.toLowerCase();
+        switch (currentFilter) {
+            case "all":
+                return true;
+            case "hiking":
+                return lc.contains("hiking") || lc.contains("nature") || lc.contains("mountain");
+            case "running":
+                return lc.contains("running") || lc.contains("jogging");
+            case "cycling":
+                return lc.contains("bike") || lc.contains("cycling");
+            default:
+                return false;
+        }
+    }
+
+    private boolean shouldShowPolyline(String trailType) {
+        switch (currentFilter) {
+            case "all":
+                return true;
+            case "hiking":
+                return trailType.equals("footway") || trailType.equals("path") || trailType.equals("steps");
+            case "running":
+                return trailType.equals("track") || trailType.equals("path");
+            case "cycling":
+                return trailType.equals("cycleway");
+            default:
+                return false;
+        }
     }
 
     private void addMapOverlays() {
@@ -282,11 +337,8 @@ public class MapsFragment extends Fragment {
     }
 
     private void checkLocationServices() {
-        LocationManager locationManager = (LocationManager) requireContext().getSystemService(Context.LOCATION_SERVICE);
-        boolean isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-        boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-
-        if (!isGpsEnabled && !isNetworkEnabled) {
+        LocationManager lm = (LocationManager) requireContext().getSystemService(Context.LOCATION_SERVICE);
+        if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) && !lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
             new AlertDialog.Builder(requireContext())
                     .setTitle("Location Services Disabled")
                     .setMessage("Please enable GPS or Network location in your device settings.")
@@ -297,15 +349,10 @@ public class MapsFragment extends Fragment {
 
     private void requestLocationPermissionIfNeeded() {
         if (hasLocationPermissions()) {
-            Log.d(TAG, "Location permissions already granted");
             enableMyLocationOverlay();
             findAndCenterOnUserLocation();
         } else {
-            Log.d(TAG, "Requesting location permissions");
-            requestPermissionsLauncher.launch(new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-            });
+            requestPermissionsLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION});
         }
     }
 
@@ -314,54 +361,34 @@ public class MapsFragment extends Fragment {
                 ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    /**
-     * The main method to find the user's location. It prioritizes a fresh, high-accuracy
-     * location. If that fails, it falls back to the last known location.
-     */
     private void findAndCenterOnUserLocation() {
-        if (!hasLocationPermissions()) {
-            Log.w(TAG, "Cannot find location without permissions.");
-            return;
-        }
-
+        if (!hasLocationPermissions()) return;
         try {
-            // 1. A-Try to get a FRESH, CURRENT location
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                     .addOnSuccessListener(requireActivity(), location -> {
                         if (location != null) {
-                            GeoPoint currentLocation = new GeoPoint(location.getLatitude(), location.getLongitude());
-                            Log.d(TAG, "SUCCESS: Found current location: " + currentLocation);
-                            centerMapOnLocation(currentLocation, "Current location found!");
+                            GeoPoint currentGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+                            lastKnownLocation = currentGeoPoint;
+                            centerMapOnLocation(currentGeoPoint, "Current location found!");
                         } else {
-                            // 2. B-Current location is null, fall back to LAST KNOWN location
-                            Log.w(TAG, "Current location is null, trying last known location.");
                             getLastKnownLocation();
                         }
                     })
-                    .addOnFailureListener(requireActivity(), e -> {
-                        // 3. C-Failed to get current location, fall back to LAST KNOWN location
-                        Log.e(TAG, "Failed to get current location, trying last known.", e);
-                        getLastKnownLocation();
-                    });
+                    .addOnFailureListener(requireActivity(), e -> getLastKnownLocation());
         } catch (SecurityException e) {
             Log.e(TAG, "SecurityException while finding location.", e);
-            showLocationError("Location permissions were denied.");
         }
     }
 
-    /**
-     * Fallback method to get the last known location.
-     */
     private void getLastKnownLocation() {
         try {
             fusedLocationClient.getLastLocation().addOnSuccessListener(requireActivity(), location -> {
                 if (location != null) {
-                    GeoPoint lastKnownLocation = new GeoPoint(location.getLatitude(), location.getLongitude());
-                    Log.d(TAG, "SUCCESS (Fallback): Found last known location: " + lastKnownLocation);
-                    centerMapOnLocation(lastKnownLocation, "Using last known location.");
+                    GeoPoint lastGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+                    lastKnownLocation = lastGeoPoint;
+                    centerMapOnLocation(lastGeoPoint, "Using last known location.");
                 } else {
-                    Log.e(TAG, "FAILURE: Last known location is also null. Cannot find user.");
-                    showLocationError("Could not determine your location. Please ensure location services are enabled.");
+                    Toast.makeText(requireContext(), "Could not determine your location.", Toast.LENGTH_LONG).show();
                 }
             });
         } catch (SecurityException e) {
@@ -369,42 +396,25 @@ public class MapsFragment extends Fragment {
         }
     }
 
-    /**
-     * Helper method to move the map and fetch trail data.
-     */
     private void centerMapOnLocation(GeoPoint location, String toastMessage) {
         requireActivity().runOnUiThread(() -> {
-            mapView.getController().animateTo(location);
-            mapView.getController().setZoom(16.0);
+            if (!isNavigating) {
+                mapView.getController().animateTo(location);
+                mapView.getController().setZoom(16.0);
+            }
             Toast.makeText(requireContext(), toastMessage, Toast.LENGTH_SHORT).show();
             fetchNearbyTrailheadsFromGoogle(location);
         });
     }
 
-    private void showLocationError(String message) {
-        requireActivity().runOnUiThread(() ->
-                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
-        );
-    }
-
-    /**
-     * Sets up the blue dot overlay on the map to show the user's live position.
-     * This method no longer centers the map; it only handles the visual indicator.
-     */
     private void enableMyLocationOverlay() {
-        if (myLocationOverlay != null) {
-            return; // Already enabled
-        }
-        if (!hasLocationPermissions()) {
-            return;
-        }
+        if (myLocationOverlay != null || !hasLocationPermissions()) return;
         try {
             GpsMyLocationProvider provider = new GpsMyLocationProvider(requireContext());
             provider.setLocationUpdateMinTime(2000);
             provider.setLocationUpdateMinDistance(10);
             myLocationOverlay = new MyLocationNewOverlay(provider, mapView);
 
-            // Set a custom icon for the location marker
             try {
                 Drawable drawable = ContextCompat.getDrawable(requireContext(), R.drawable.ic_person_pin);
                 Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
@@ -412,41 +422,27 @@ public class MapsFragment extends Fragment {
                 drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
                 drawable.draw(canvas);
                 myLocationOverlay.setPersonIcon(bitmap);
-                myLocationOverlay.setPersonHotspot(0.5f, 0.95f); // Center bottom
+                myLocationOverlay.setPersonHotspot(0.5f, 0.95f);
             } catch (Exception e) {
                 Log.w(TAG, "Failed to set custom person icon.", e);
             }
 
             myLocationOverlay.enableMyLocation();
             myLocationOverlay.setDrawAccuracyEnabled(true);
-            mapView.getOverlays().add(0, myLocationOverlay); // Add at the bottom
+            mapView.getOverlays().add(0, myLocationOverlay);
         } catch (Exception e) {
             Log.e(TAG, "Error enabling MyLocationOverlay", e);
         }
     }
 
-    // ENHANCED: Increased search radius and multiple searches with different keywords
     private void fetchNearbyTrailheadsFromGoogle(GeoPoint center) {
         String apiKey = getString(R.string.map_api);
-        double lat = center.getLatitude();
-        double lng = center.getLongitude();
-
-        Log.d(TAG, "Fetching trailheads near: " + lat + ", " + lng);
-
-        // ENHANCED: More comprehensive search terms and increased radius
-        String[] searchTerms = {
-                "hiking trail", "nature trail", "walking trail", "forest trail",
-                "mountain trail", "bike trail", "cycling path", "running track",
-                "jogging path", "nature walk", "scenic trail", "wilderness trail",
-                "park trail", "recreation trail"
-        };
-
-        // ENHANCED: Increased radius from 5000 to 15000 meters (15km)
+        String[] searchTerms = {"hiking trail", "nature trail", "bike trail", "running track"};
         int radiusMeters = 15000;
 
         for (String keyword : searchTerms) {
             String url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
-                    "?location=" + lat + "," + lng +
+                    "?location=" + center.getLatitude() + "," + center.getLongitude() +
                     "&radius=" + radiusMeters +
                     "&type=park&keyword=" + keyword +
                     "&key=" + apiKey;
@@ -460,100 +456,49 @@ public class MapsFragment extends Fragment {
 
                 @Override
                 public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                    if (!response.isSuccessful()) {
-                        Log.w(TAG, "Places API response not successful: " + response.code());
-                        return;
-                    }
+                    if (!response.isSuccessful()) return;
                     String jsonData = response.body().string();
-
                     try {
                         JsonObject root = gson.fromJson(jsonData, JsonObject.class);
-                        JsonArray results = root.has("results") ? root.getAsJsonArray("results") : null;
-                        if (results == null || results.size() == 0) {
-                            Log.d(TAG, "No results found for keyword: " + keyword);
-                            return;
+                        JsonArray results = root.getAsJsonArray("results");
+                        if (results != null) {
+                            requireActivity().runOnUiThread(() -> addTrailheadsAndQueryOSM(results, keyword));
                         }
-
-                        Log.d(TAG, "Found " + results.size() + " places for keyword: " + keyword);
-                        requireActivity().runOnUiThread(() -> addTrailheadsAndQueryOSM(results, keyword));
                     } catch (Exception ex) {
-                        Log.e(TAG, "Places parse error for keyword: " + keyword, ex);
+                        Log.e(TAG, "Places parse error", ex);
                     }
                 }
             });
         }
     }
 
-    // ENHANCED: Increased limit and added detailed trail information
     private void addTrailheadsAndQueryOSM(JsonArray results, String category) {
-        // ENHANCED: Increased from 10 to 20 results per category
         int count = Math.min(results.size(), 20);
-        Log.d(TAG, "Adding " + count + " trailheads for category: " + category);
-
         for (int i = 0; i < count; i++) {
             try {
                 JsonObject place = results.get(i).getAsJsonObject();
                 JsonObject geometry = place.getAsJsonObject("geometry");
-                if (geometry == null) continue;
                 JsonObject location = geometry.getAsJsonObject("location");
-                if (location == null) continue;
-
                 double lat = location.get("lat").getAsDouble();
                 double lon = location.get("lng").getAsDouble();
                 GeoPoint gp = new GeoPoint(lat, lon);
-
-                String name = place.has("name") ? place.get("name").getAsString() : "Trail";
-                String placeId = place.has("place_id") ? place.get("place_id").getAsString() : "";
+                String name = place.get("name").getAsString();
+                String placeId = place.get("place_id").getAsString();
                 double rating = place.has("rating") ? place.get("rating").getAsDouble() : 0.0;
-
-                // ENHANCED: Generate realistic trail details
-                TrailDetails details = generateTrailDetails(name, category, rating);
+                TrailDetails details = generateTrailDetails(name, category, rating, gp);
                 trailDetailsMap.put(placeId, details);
-
-                int iconRes = R.drawable.ic_trail;
-                String lc = category.toLowerCase();
-                if (lc.contains("hiking") || lc.contains("nature") || lc.contains("mountain") || lc.contains("forest")) {
-                    iconRes = R.drawable.ic_hiking;
-                } else if (lc.contains("running") || lc.contains("jogging") || lc.contains("track")) {
-                    iconRes = R.drawable.ic_running;
-                } else if (lc.contains("bike") || lc.contains("cycling")) {
-                    iconRes = R.drawable.ic_walk; // Use walk icon if cycling icon not available
-                }
-
                 Marker m = new Marker(mapView);
                 m.setPosition(gp);
                 m.setTitle(name);
                 m.setSubDescription(category);
-                m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-
-                try {
-                    m.setIcon(ContextCompat.getDrawable(requireContext(), iconRes));
-                } catch (Exception e) {
-                    Log.w(TAG, "Icon not found, using default marker", e);
-                }
-
-                // ENHANCED: Show detailed trail information on marker click
                 m.setOnMarkerClickListener((marker, mapView) -> {
                     showTrailDetailsDialog(placeId, details);
                     return true;
                 });
-
-                // Store the marker for filtering
                 allTrailMarkers.add(m);
-
-                // Add to map if it matches current filter
-                if (currentFilter.equals("all") ||
-                        (currentFilter.equals("hiking") && (category.toLowerCase().contains("hiking") ||
-                                category.toLowerCase().contains("nature") || category.toLowerCase().contains("mountain"))) ||
-                        (currentFilter.equals("running") && (category.toLowerCase().contains("running") ||
-                                category.toLowerCase().contains("jogging"))) ||
-                        (currentFilter.equals("cycling") && (category.toLowerCase().contains("bike") ||
-                                category.toLowerCase().contains("cycling")))) {
+                if (shouldShowMarker(category)) {
                     mapView.getOverlays().add(m);
                 }
-
-                // ENHANCED: Increased radius for trail geometry search
-                fetchTrailsFromOverpass(lat, lon);
             } catch (Exception e) {
                 Log.e(TAG, "Error processing place result", e);
             }
@@ -561,138 +506,323 @@ public class MapsFragment extends Fragment {
         mapView.invalidate();
     }
 
-    // ENHANCED: Generate realistic trail details
-    private TrailDetails generateTrailDetails(String name, String category, double rating) {
+    private TrailDetails generateTrailDetails(String name, String category, double rating, GeoPoint startPoint) {
         Random random = new Random();
-
-        // Generate difficulty based on category and random factors
-        String[] difficulties = {"Easy", "Moderate", "Challenging", "Difficult"};
+        String[] difficulties = {"Easy", "Moderate", "Challenging"};
         String difficulty = difficulties[random.nextInt(difficulties.length)];
-
-        // Generate distance based on trail type
-        String distance;
-        if (category.toLowerCase().contains("running") || category.toLowerCase().contains("jogging")) {
-            distance = String.format("%.1f km", 2.0 + random.nextDouble() * 8.0); // 2-10km for running
-        } else if (category.toLowerCase().contains("cycling") || category.toLowerCase().contains("bike")) {
-            distance = String.format("%.1f km", 5.0 + random.nextDouble() * 25.0); // 5-30km for cycling
-        } else {
-            distance = String.format("%.1f km", 1.0 + random.nextDouble() * 12.0); // 1-13km for hiking
-        }
-
-        // Generate elevation gain
-        String elevation = String.format("%d m", 50 + random.nextInt(800)); // 50-850m elevation gain
-
-        // Generate description based on category
-        String description = generateTrailDescription(name, category, difficulty);
-
-        // Use actual rating or generate one
-        if (rating == 0.0) {
-            rating = 3.0 + random.nextDouble() * 2.0; // 3.0-5.0 rating
-        }
-
-        String location = "Near your location";
-
-        return new TrailDetails(name, description, difficulty, distance, elevation, category, rating, location);
+        double distanceKm = 2.0 + random.nextDouble() * 8.0;
+        String distance = String.format(Locale.US, "%.1f km", distanceKm);
+        String elevation = String.format(Locale.US, "%d m", 50 + random.nextInt(450));
+        String description = "A scenic " + category + " trail rated as " + difficulty + ".";
+        double finalRating = (rating == 0.0) ? (3.0 + random.nextDouble() * 2.0) : rating;
+        TrailDetails details = new TrailDetails(name, description, difficulty, distance, elevation, category, finalRating, "Near you");
+        details.routePoints.add(startPoint);
+        return details;
     }
 
-    private String generateTrailDescription(String name, String category, String difficulty) {
-        String[] baseDescriptions = {
-                "A beautiful trail offering stunning views and peaceful surroundings.",
-                "Perfect for outdoor enthusiasts seeking adventure in nature.",
-                "Well-maintained path suitable for various skill levels.",
-                "Scenic route through diverse landscapes and natural habitats.",
-                "Popular trail known for its breathtaking vistas and wildlife.",
-                "Peaceful pathway ideal for connecting with nature.",
-                "Challenging route that rewards hikers with spectacular panoramas."
-        };
-
-        String[] terrainTypes = {
-                "forest paths", "mountain ridges", "riverside trails", "meadow walks",
-                "rocky terrain", "woodland areas", "open fields", "hillside routes"
-        };
-
-        Random random = new Random();
-        String baseDesc = baseDescriptions[random.nextInt(baseDescriptions.length)];
-        String terrain = terrainTypes[random.nextInt(terrainTypes.length)];
-
-        return baseDesc + " Features " + terrain + " and is rated as " + difficulty.toLowerCase() + " difficulty.";
-    }
-
-    // ENHANCED: Beautiful dialog with detailed trail information
     private void showTrailDetailsDialog(String placeId, TrailDetails details) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-
-        // Create custom layout
+        builder.setTitle(details.name);
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(50, 30, 50, 30);
-
-        // Title
-        TextView titleView = new TextView(requireContext());
-        titleView.setText(details.name);
-        titleView.setTextSize(22);
-        titleView.setTextColor(Color.parseColor("#2E7D32"));
-        titleView.setPadding(0, 0, 0, 20);
-        titleView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        layout.addView(titleView);
-
-        // Rating
-        TextView ratingView = new TextView(requireContext());
-        String stars = getStarRating(details.rating);
-        ratingView.setText(String.format("Rating: %s (%.1f/5.0)", stars, details.rating));
-        ratingView.setTextSize(16);
-        ratingView.setPadding(0, 0, 0, 15);
-        layout.addView(ratingView);
-
-        // Trail info grid
-        addInfoRow(layout, "🏔️ Difficulty:", details.difficulty, getDifficultyColor(details.difficulty));
-        addInfoRow(layout, "📏 Distance:", details.distance, Color.parseColor("#1976D2"));
-        addInfoRow(layout, "⬆️ Elevation:", details.elevation, Color.parseColor("#FF8F00"));
-        addInfoRow(layout, "🎯 Type:", details.type, Color.parseColor("#7B1FA2"));
-
-        // Description
-        TextView descView = new TextView(requireContext());
-        descView.setText("\n📝 Description:\n" + details.description);
-        descView.setTextSize(14);
-        descView.setPadding(0, 20, 0, 0);
-        descView.setLineSpacing(1.2f, 1.0f);
-        layout.addView(descView);
-
+        layout.setPadding(40, 30, 40, 30);
+        addInfoRow(layout, "Type", details.type, Color.BLACK);
+        addInfoRow(layout, "Difficulty", details.difficulty, getDifficultyColor(details.difficulty));
+        addInfoRow(layout, "Distance", details.distance, Color.BLACK);
+        addInfoRow(layout, "Elevation", details.elevation, Color.BLACK);
+        addInfoRow(layout, "Rating", getStarRating(details.rating), Color.parseColor("#FFA500"));
+        TextView descriptionView = new TextView(requireContext());
+        descriptionView.setText(details.description);
+        descriptionView.setPadding(0, 20, 0, 0);
+        layout.addView(descriptionView);
         builder.setView(layout);
-        builder.setPositiveButton("Start Navigation", (dialog, which) -> {
-            Toast.makeText(requireContext(), "Navigation feature coming soon!", Toast.LENGTH_SHORT).show();
-        });
-        builder.setNeutralButton("Save Trail", (dialog, which) -> {
-            Toast.makeText(requireContext(), "Trail saved to favorites!", Toast.LENGTH_SHORT).show();
-        });
+        builder.setPositiveButton("Start Navigation", (dialog, which) -> startNavigation(details));
         builder.setNegativeButton("Close", null);
+        builder.show();
+    }
 
-        AlertDialog dialog = builder.create();
-        dialog.show();
+    private void startNavigation(TrailDetails details) {
+        if (!hasLocationPermissions()) {
+            Toast.makeText(requireContext(), "Location permission required for navigation", Toast.LENGTH_SHORT).show();
+            requestLocationPermissionIfNeeded();
+            return;
+        }
+        fetchRealRouteAndStartNavigation(details);
+    }
 
-        // Style the buttons
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#2E7D32"));
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setTextColor(Color.parseColor("#1976D2"));
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#757575"));
+    private void fetchRealRouteAndStartNavigation(TrailDetails details) {
+        if (lastKnownLocation == null || details.routePoints.isEmpty()) {
+            Toast.makeText(requireContext(), "Cannot determine start or end point for navigation.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        GeoPoint startPoint = lastKnownLocation;
+        GeoPoint endPoint = details.routePoints.get(0);
+
+        String apiKey = getString(R.string.ors_api_key);
+        String url = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
+
+        String postBody = String.format(Locale.US,
+                "{\"coordinates\":[[%f,%f],[%f,%f]]}",
+                startPoint.getLongitude(), startPoint.getLatitude(),
+                endPoint.getLongitude(), endPoint.getLatitude()
+        );
+
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(postBody, okhttp3.MediaType.parse("application/json; charset=utf-8"));
+        Request request = new Request.Builder()
+                .url(url)
+                .header("Authorization", apiKey)
+                .post(body)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.e(TAG, "Openrouteservice fetch failed", e);
+                requireActivity().runOnUiThread(() ->
+                        Toast.makeText(requireContext(), "Failed to calculate route.", Toast.LENGTH_SHORT).show()
+                );
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Log.e(TAG, "Openrouteservice response error: " + response.code() + " " + response.message());
+                    return;
+                }
+
+                try {
+                    String responseData = response.body().string();
+                    JsonObject json = gson.fromJson(responseData, JsonObject.class);
+
+                    JsonArray features = json.getAsJsonArray("features");
+                    if (features == null || features.size() == 0) return;
+
+                    JsonObject feature = features.get(0).getAsJsonObject();
+                    JsonObject properties = feature.getAsJsonObject("properties");
+                    JsonObject geometry = feature.getAsJsonObject("geometry");
+
+                    JsonArray segments = properties.getAsJsonArray("segments");
+                    JsonArray stepsJson = segments.get(0).getAsJsonObject().getAsJsonArray("steps");
+                    JsonArray coordinates = geometry.getAsJsonArray("coordinates");
+
+                    List<GeoPoint> routePoints = new ArrayList<>();
+                    for (JsonElement coord : coordinates) {
+                        JsonArray lonLat = coord.getAsJsonArray();
+                        routePoints.add(new GeoPoint(lonLat.get(1).getAsDouble(), lonLat.get(0).getAsDouble()));
+                    }
+
+                    List<NavigationStep> navigationSteps = parseOrsSteps(stepsJson, routePoints);
+
+                    requireActivity().runOnUiThread(() -> {
+                        startNavigationWithRealData(details, routePoints, navigationSteps);
+                    });
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing ORS response", e);
+                }
+            }
+        });
+    }
+
+    private List<NavigationStep> parseOrsSteps(JsonArray stepsJson, List<GeoPoint> routePoints) {
+        List<NavigationStep> steps = new ArrayList<>();
+        if (stepsJson == null) return steps;
+
+        for (JsonElement stepElement : stepsJson) {
+            JsonObject stepObject = stepElement.getAsJsonObject();
+            String instruction = stepObject.get("instruction").getAsString();
+            double distance = stepObject.get("distance").getAsDouble();
+            JsonArray wayPoints = stepObject.get("way_points").getAsJsonArray();
+            int pointIndex = wayPoints.get(0).getAsInt();
+            GeoPoint stepLocation = routePoints.get(pointIndex);
+            steps.add(new NavigationStep(stepLocation, instruction, distance, ""));
+        }
+        return steps;
+    }
+
+    private void startNavigationWithRealData(TrailDetails details, List<GeoPoint> realRoutePoints, List<NavigationStep> realSteps) {
+        try {
+            if (realRoutePoints.size() < 2) {
+                Toast.makeText(requireContext(), "Invalid route data received.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            isNavigating = true;
+            currentNavigation = new NavigationData(
+                    details.name,
+                    realRoutePoints,
+                    details.type,
+                    Double.parseDouble(details.distance.replace(" km", ""))
+            );
+
+            this.navigationSteps = realSteps;
+            this.currentStepIndex = 0;
+
+            if (navigationPanel != null) {
+                navigationPanel.setVisibility(View.VISIBLE);
+            }
+
+            drawNavigationRoute(realRoutePoints);
+            startNavigationLocationUpdates();
+            updateNavigationUI();
+
+            Toast.makeText(requireContext(), "Navigation started for " + details.name, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting navigation with real data", e);
+        }
+    }
+
+    private void drawNavigationRoute(List<GeoPoint> routePoints) {
+        if (navigationRoute != null) {
+            mapView.getOverlays().remove(navigationRoute);
+        }
+        navigationRoute = new Polyline(mapView);
+        navigationRoute.setPoints(routePoints);
+        navigationRoute.setWidth(12f);
+        navigationRoute.setColor(Color.parseColor("#4285F4"));
+        navigationRoute.setTitle("Navigation Route");
+        mapView.getOverlays().add(navigationRoute);
+        mapView.invalidate();
+    }
+
+    private void startNavigationLocationUpdates() {
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+        }
+
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
+                .setMinUpdateIntervalMillis(1000)
+                .build();
+
+        navigationLocationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                if (!isNavigating) return;
+                Location location = locationResult.getLastLocation();
+                if (location != null) {
+                    lastKnownLocation = new GeoPoint(location.getLatitude(), location.getLongitude());
+                    updateNavigation(lastKnownLocation);
+                }
+            }
+        };
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, navigationLocationCallback, Looper.getMainLooper());
+        } catch (SecurityException e) {
+            Log.e(TAG, "SecurityException when requesting location updates", e);
+        }
+    }
+
+    private void updateNavigation(GeoPoint currentLocation) {
+        if (navigationSteps == null || navigationSteps.isEmpty() || currentStepIndex >= navigationSteps.size()) {
+            return;
+        }
+
+        NavigationStep currentStep = navigationSteps.get(currentStepIndex);
+        double distanceToStep = calculateDistance(currentLocation, currentStep.point);
+
+        if (distanceToStep < 25 && currentStepIndex < navigationSteps.size() - 1) {
+            currentStepIndex++;
+            NavigationStep nextStep = navigationSteps.get(currentStepIndex);
+            if (textToSpeech != null) {
+                textToSpeech.speak(nextStep.instruction, TextToSpeech.QUEUE_FLUSH, null, null);
+            }
+        }
+
+        updateNavigationUI();
+    }
+
+    private void updateNavigationUI() {
+        if (navigationSteps == null || currentStepIndex >= navigationSteps.size() || !isNavigating) {
+            return;
+        }
+
+        final NavigationStep currentStep = navigationSteps.get(currentStepIndex);
+
+        requireActivity().runOnUiThread(() -> {
+            navigationInstruction.setText(currentStep.instruction);
+
+            double distanceToNextStep = calculateDistance(lastKnownLocation, currentStep.point);
+            distanceToNext.setText(String.format(Locale.US, "%.0f m", distanceToNextStep));
+
+            double remainingDist = calculateRemainingDistance();
+            remainingDistance.setText(String.format(Locale.US, "%.1f km", remainingDist / 1000));
+
+            int minutes = (int) ((remainingDist / 1000) / 5 * 60);
+            estimatedTime.setText(String.format(Locale.US, "%d min", minutes));
+
+            double totalDistance = currentNavigation.totalDistance * 1000;
+            if (totalDistance > 0) {
+                double traveled = totalDistance - remainingDist;
+                int progress = (int) ((traveled / totalDistance) * 100);
+                navigationProgress.setProgress(Math.max(0, Math.min(100, progress)));
+            }
+        });
+    }
+
+    private double calculateRemainingDistance() {
+        if (navigationSteps == null || lastKnownLocation == null || currentStepIndex >= navigationSteps.size()) {
+            return 0;
+        }
+        double remaining = 0;
+        remaining += calculateDistance(lastKnownLocation, navigationSteps.get(currentStepIndex).point);
+        for (int i = currentStepIndex; i < navigationSteps.size() - 1; i++) {
+            remaining += calculateDistance(navigationSteps.get(i).point, navigationSteps.get(i + 1).point);
+        }
+        return remaining;
+    }
+
+    private double calculateDistance(GeoPoint p1, GeoPoint p2) {
+        float[] results = new float[1];
+        Location.distanceBetween(p1.getLatitude(), p1.getLongitude(), p2.getLatitude(), p2.getLongitude(), results);
+        return results[0];
+    }
+
+    private void stopNavigation() {
+        isNavigating = false;
+        currentNavigation = null;
+        if (navigationRoute != null) {
+            mapView.getOverlays().remove(navigationRoute);
+            navigationRoute = null;
+        }
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+            navigationLocationCallback = null;
+        }
+        if (navigationPanel != null) {
+            navigationPanel.setVisibility(View.GONE);
+        }
+        mapView.invalidate();
+        Toast.makeText(requireContext(), "Navigation stopped", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+        }
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+        }
+        mapView.onDetach();
     }
 
     private void addInfoRow(LinearLayout parent, String label, String value, int valueColor) {
         LinearLayout row = new LinearLayout(requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(0, 8, 0, 8);
-
         TextView labelView = new TextView(requireContext());
         labelView.setText(label);
         labelView.setTextSize(15);
         labelView.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
         TextView valueView = new TextView(requireContext());
         valueView.setText(value);
         valueView.setTextSize(15);
         valueView.setTextColor(valueColor);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         valueView.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_END);
-
         row.addView(labelView);
         row.addView(valueView);
         parent.addView(row);
@@ -700,17 +830,14 @@ public class MapsFragment extends Fragment {
 
     private String getStarRating(double rating) {
         int fullStars = (int) rating;
-        boolean hasHalfStar = (rating - fullStars) >= 0.5;
-
         StringBuilder stars = new StringBuilder();
         for (int i = 0; i < fullStars; i++) {
-            stars.append("⭐");
+            stars.append("★");
         }
-        if (hasHalfStar) {
-            stars.append("⭐");
+        if ((rating - fullStars) >= 0.5) {
+            stars.append("★");
         }
-        int emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-        for (int i = 0; i < emptyStars; i++) {
+        while (stars.length() < 5) {
             stars.append("☆");
         }
         return stars.toString();
@@ -727,222 +854,8 @@ public class MapsFragment extends Fragment {
             case "difficult":
                 return Color.parseColor("#9C27B0"); // Purple
             default:
-                return Color.parseColor("#757575"); // Gray
+                return Color.BLACK;
         }
     }
+}
 
-    /**
-     * ENHANCED: Fetches trail geometry from Overpass API with increased radius and draws them with type-specific colors.
-     */
-    private void fetchTrailsFromOverpass(double lat, double lon) {
-        // ENHANCED: Increased radius from 1000 to 3000 meters and added more trail types
-        String overpassUrl = "https://overpass-api.de/api/interpreter?data=[out:json];" +
-                "way[\"highway\"~\"path|footway|track|cycleway|bridleway|steps\"](around:3000," + lat + "," + lon + ");out geom;";
-
-        Request request = new Request.Builder().url(overpassUrl).build();
-        client.newCall(request).enqueue(new Callback() {
-            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                Log.e(TAG, "Overpass fetch failed", e);
-            }
-
-            @Override public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                if (!response.isSuccessful()) return;
-                String jsonData = response.body().string();
-
-                try {
-                    JsonObject json = gson.fromJson(jsonData, JsonObject.class);
-                    JsonArray elements = json.getAsJsonArray("elements");
-                    if (elements == null) return;
-
-                    List<Polyline> newPolylines = new ArrayList<>();
-
-                    for (JsonElement el : elements) {
-                        JsonObject way = el.getAsJsonObject();
-                        if (!way.has("geometry")) continue;
-
-                        JsonArray geom = way.getAsJsonArray("geometry");
-                        List<GeoPoint> pts = new ArrayList<>();
-                        for (JsonElement cEl : geom) {
-                            JsonObject c = cEl.getAsJsonObject();
-                            pts.add(new GeoPoint(c.get("lat").getAsDouble(), c.get("lon").getAsDouble()));
-                        }
-                        if (pts.size() < 2) continue;
-
-                        // Get the trail type from OSM tags
-                        String highwayType = way.has("tags") && way.getAsJsonObject("tags").has("highway")
-                                ? way.getAsJsonObject("tags").get("highway").getAsString()
-                                : "trail";
-
-                        // ENHANCED: More trail types and better color coding
-                        int trailColor;
-                        switch (highwayType) {
-                            case "footway":
-                            case "path":
-                                // Blue for hiking/walking paths 🚶
-                                trailColor = Color.parseColor("#2196F3");
-                                break;
-                            case "track":
-                                // Red for wider tracks, good for running 🏃
-                                trailColor = Color.parseColor("#F44336");
-                                break;
-                            case "cycleway":
-                                // Purple for dedicated cycle paths 🚲
-                                trailColor = Color.parseColor("#9C27B0");
-                                break;
-                            case "bridleway":
-                                // Brown for horse riding trails 🐎
-                                trailColor = Color.parseColor("#795548");
-                                break;
-                            case "steps":
-                                // Orange for steps/stairs
-                                trailColor = Color.parseColor("#FF9800");
-                                break;
-                            default:
-                                // Dark Gray for any other type
-                                trailColor = Color.parseColor("#607D8B");
-                                break;
-                        }
-
-                        Polyline line = new Polyline(mapView);
-                        line.setPoints(pts);
-                        line.setWidth(8f);
-                        line.setColor(trailColor);
-
-                        // ENHANCED: Better trail information with clickable polylines
-                        String trailTypeName = getTrailTypeName(highwayType);
-                        line.setTitle("Trail Path - " + trailTypeName);
-                        line.setSnippet("Type: " + highwayType);
-
-                        line.setOnClickListener((polyline, mapView, eventPos) -> {
-                            showTrailPathInfo(trailTypeName, highwayType, trailColor);
-                            return true;
-                        });
-
-                        // Store the polyline for filtering
-                        allTrailLines.add(line);
-                        newPolylines.add(line);
-                    }
-
-                    requireActivity().runOnUiThread(() -> {
-                        // Add to map if it matches current filter
-                        for (Polyline line : newPolylines) {
-                            String snippet = line.getSnippet();
-                            if (snippet != null) {
-                                String trailType = snippet.replace("Type: ", "");
-
-                                if (currentFilter.equals("all") ||
-                                        (currentFilter.equals("hiking") && (trailType.equals("footway") || trailType.equals("path") || trailType.equals("steps"))) ||
-                                        (currentFilter.equals("running") && trailType.equals("track")) ||
-                                        (currentFilter.equals("cycling") && trailType.equals("cycleway"))) {
-                                    mapView.getOverlays().add(line);
-                                }
-                            }
-                        }
-                        mapView.invalidate();
-                    });
-                } catch (Exception ex) {
-                    Log.e(TAG, "Overpass parse error", ex);
-                }
-            }
-        });
-    }
-
-    private String getTrailTypeName(String highwayType) {
-        switch (highwayType) {
-            case "footway":
-                return "Footway";
-            case "path":
-                return "Nature Path";
-            case "track":
-                return "Track/Running Trail";
-            case "cycleway":
-                return "Cycle Path";
-            case "bridleway":
-                return "Bridleway";
-            case "steps":
-                return "Steps/Stairs";
-            default:
-                return "Trail";
-        }
-    }
-
-    private void showTrailPathInfo(String trailTypeName, String highwayType, int color) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-
-        LinearLayout layout = new LinearLayout(requireContext());
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(40, 30, 40, 30);
-
-        TextView titleView = new TextView(requireContext());
-        titleView.setText("🛤️ " + trailTypeName);
-        titleView.setTextSize(20);
-        titleView.setTextColor(color);
-        titleView.setPadding(0, 0, 0, 15);
-        layout.addView(titleView);
-
-        TextView infoView = new TextView(requireContext());
-        String info = getTrailTypeDescription(highwayType);
-        infoView.setText(info);
-        infoView.setTextSize(14);
-        infoView.setLineSpacing(1.2f, 1.0f);
-        layout.addView(infoView);
-
-        builder.setView(layout);
-        builder.setTitle("Trail Information");
-        builder.setPositiveButton("OK", null);
-        builder.show();
-    }
-
-    private String getTrailTypeDescription(String highwayType) {
-        switch (highwayType) {
-            case "footway":
-                return "A designated path for pedestrians. Usually paved or well-maintained, perfect for walking and light hiking.";
-            case "path":
-                return "A narrow way or track, often unpaved. Ideal for hiking, nature walks, and exploring natural areas.";
-            case "track":
-                return "A wider unpaved road or path, suitable for vehicles but great for running, jogging, and mountain biking.";
-            case "cycleway":
-                return "A path or road designated for cyclists. May be shared with pedestrians or exclusively for bikes.";
-            case "bridleway":
-                return "A path designated for horse riders, often also suitable for walking and sometimes cycling.";
-            case "steps":
-                return "Steps or stairs, usually found on steep terrain. Great for intense workouts and accessing elevated areas.";
-            default:
-                return "A general trail path suitable for various outdoor activities.";
-        }
-    }
-
-    // --- Lifecycle methods for OSMdroid MapView ---
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (mapView != null) {
-            mapView.onResume();
-        }
-        if (myLocationOverlay != null && !myLocationOverlay.isMyLocationEnabled() && hasLocationPermissions()) {
-            myLocationOverlay.enableMyLocation();
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (mapView != null) {
-            mapView.onPause();
-        }
-        if (myLocationOverlay != null) {
-            myLocationOverlay.disableMyLocation();
-        }
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (myLocationOverlay != null) {
-            myLocationOverlay.disableMyLocation();
-            myLocationOverlay = null;
-        }
-        if (mapView != null) {
-            mapView.onDetach();
-        }
-    }}
