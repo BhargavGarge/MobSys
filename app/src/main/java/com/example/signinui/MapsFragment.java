@@ -3,6 +3,7 @@ package com.example.signinui;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -15,12 +16,14 @@ import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
@@ -34,6 +37,7 @@ import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import com.example.signinui.model.TrailDetails; // IMPORT THE SHARED MODEL
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -114,24 +118,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     private int currentStepIndex = 0;
 
     // Data classes
-    private static class TrailDetails {
-        String name, description, difficulty, distance, elevation, type, location;
-        double rating;
-        List<GeoPoint> routePoints;
-
-        TrailDetails(String name, String description, String difficulty, String distance, String elevation, String type, double rating, String location) {
-            this.name = name;
-            this.description = description;
-            this.difficulty = difficulty;
-            this.distance = distance;
-            this.elevation = elevation;
-            this.type = type;
-            this.rating = rating;
-            this.location = location;
-            this.routePoints = new ArrayList<>();
-        }
-    }
-
+    // NOTE: TrailDetails inner class was removed to use the shared model class.
     private static class NavigationData {
         String trailName, trailType;
         List<GeoPoint> routePoints;
@@ -485,7 +472,11 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                 String name = place.get("name").getAsString();
                 String placeId = place.get("place_id").getAsString();
                 double rating = place.has("rating") ? place.get("rating").getAsDouble() : 0.0;
-                TrailDetails details = generateTrailDetails(name, category, rating, gp);
+
+                // FIXED: Pass placeId to generateTrailDetails and load initial status
+                TrailDetails details = generateTrailDetails(placeId, name, category, rating, gp);
+                loadInitialTrailStatus(details);
+
                 trailDetailsMap.put(placeId, details);
                 Marker m = new Marker(mapView);
                 m.setPosition(gp);
@@ -506,7 +497,8 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         mapView.invalidate();
     }
 
-    private TrailDetails generateTrailDetails(String name, String category, double rating, GeoPoint startPoint) {
+    // FIXED: generateTrailDetails now accepts an ID
+    private TrailDetails generateTrailDetails(String id, String name, String category, double rating, GeoPoint startPoint) {
         Random random = new Random();
         String[] difficulties = {"Easy", "Moderate", "Challenging"};
         String difficulty = difficulties[random.nextInt(difficulties.length)];
@@ -515,30 +507,123 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         String elevation = String.format(Locale.US, "%d m", 50 + random.nextInt(450));
         String description = "A scenic " + category + " trail rated as " + difficulty + ".";
         double finalRating = (rating == 0.0) ? (3.0 + random.nextDouble() * 2.0) : rating;
-        TrailDetails details = new TrailDetails(name, description, difficulty, distance, elevation, category, finalRating, "Near you");
+
+        // Use the constructor from the shared model class
+        TrailDetails details = new TrailDetails(id, name, description, difficulty, distance, elevation, category, finalRating, "Near you");
         details.routePoints.add(startPoint);
         return details;
+    }
+
+    // NEW: Method to load the initial liked/saved state from SharedPreferences
+    private void loadInitialTrailStatus(TrailDetails details) {
+        if (details.id == null || requireContext() == null) return;
+        SharedPreferences savedPrefs = requireContext().getSharedPreferences("saved_trails", Context.MODE_PRIVATE);
+        details.isSaved = savedPrefs.contains(details.id);
+
+        SharedPreferences likedPrefs = requireContext().getSharedPreferences("liked_trails", Context.MODE_PRIVATE);
+        details.isLiked = likedPrefs.contains(details.id);
     }
 
     private void showTrailDetailsDialog(String placeId, TrailDetails details) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle(details.name);
+
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 30, 40, 30);
+
         addInfoRow(layout, "Type", details.type, Color.BLACK);
         addInfoRow(layout, "Difficulty", details.difficulty, getDifficultyColor(details.difficulty));
         addInfoRow(layout, "Distance", details.distance, Color.BLACK);
         addInfoRow(layout, "Elevation", details.elevation, Color.BLACK);
         addInfoRow(layout, "Rating", getStarRating(details.rating), Color.parseColor("#FFA500"));
+
         TextView descriptionView = new TextView(requireContext());
         descriptionView.setText(details.description);
-        descriptionView.setPadding(0, 20, 0, 0);
+        descriptionView.setPadding(0, 20, 0, 20);
         layout.addView(descriptionView);
+
+        // Create Like and Save buttons
+        LinearLayout buttonLayout = new LinearLayout(requireContext());
+        buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
+        buttonLayout.setGravity(Gravity.CENTER);
+
+        // Like button
+        ImageButton likeButton = new ImageButton(requireContext());
+        // FIXED: Set initial state correctly based on loaded details.isLiked
+        likeButton.setImageResource(details.isLiked ? R.drawable.ic_fav_border : R.drawable.ic_fav);
+        likeButton.setBackground(null);
+        likeButton.setColorFilter(Color.parseColor(details.isLiked ? "#FF4081" : "#757575"));
+        likeButton.setOnClickListener(v -> {
+            details.isLiked = !details.isLiked;
+            likeButton.setImageResource(details.isLiked ? R.drawable.ic_fav_border : R.drawable.ic_fav);
+            likeButton.setColorFilter(Color.parseColor(details.isLiked ? "#FF4081" : "#757575"));
+            saveTrailLikeStatus(details);
+            Toast.makeText(requireContext(), details.isLiked ? "Trail liked!" : "Trail unliked", Toast.LENGTH_SHORT).show();
+        });
+
+        // Save button
+        ImageButton saveButton = new ImageButton(requireContext());
+        // FIXED: Set initial state correctly based on loaded details.isSaved
+        saveButton.setImageResource(details.isSaved ? R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_outline);
+        saveButton.setBackground(null);
+        saveButton.setColorFilter(Color.parseColor(details.isSaved ? "#3F51B5" : "#757575"));
+        saveButton.setOnClickListener(v -> {
+            details.isSaved = !details.isSaved;
+            saveButton.setImageResource(details.isSaved ? R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_outline);
+            saveButton.setColorFilter(Color.parseColor(details.isSaved ? "#3F51B5" : "#757575"));
+            saveTrailStatus(details);
+            Toast.makeText(requireContext(), details.isSaved ? "Trail saved!" : "Trail removed", Toast.LENGTH_SHORT).show();
+        });
+
+        // Add buttons to layout
+        buttonLayout.addView(likeButton, new LinearLayout.LayoutParams(100, 100));
+        buttonLayout.addView(saveButton, new LinearLayout.LayoutParams(100, 100));
+
+        layout.addView(buttonLayout);
+
         builder.setView(layout);
         builder.setPositiveButton("Start Navigation", (dialog, which) -> startNavigation(details));
         builder.setNegativeButton("Close", null);
-        builder.show();
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Customize button colors
+        Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        positiveButton.setTextColor(Color.WHITE);
+        positiveButton.setBackgroundColor(Color.parseColor("#4CAF50"));
+
+        Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        negativeButton.setTextColor(Color.parseColor("#757575"));
+    }
+
+    // FIXED: Save the entire TrailDetails object as a JSON string
+    private void saveTrailStatus(TrailDetails details) {
+        SharedPreferences prefs = requireContext().getSharedPreferences("saved_trails", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        if (details.isSaved) {
+            String json = gson.toJson(details);
+            editor.putString(details.id, json);
+        } else {
+            editor.remove(details.id);
+        }
+        editor.apply();
+    }
+
+    // FIXED: Save the entire TrailDetails object as a JSON string
+    private void saveTrailLikeStatus(TrailDetails details) {
+        SharedPreferences prefs = requireContext().getSharedPreferences("liked_trails", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        if (details.isLiked) {
+            String json = gson.toJson(details);
+            editor.putString(details.id, json);
+        } else {
+            editor.remove(details.id);
+        }
+        editor.apply();
     }
 
     private void startNavigation(TrailDetails details) {
@@ -858,4 +943,3 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         }
     }
 }
-

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/gradient_header">
-   >
+    >
 
     <!-- Updated top section to use gradient background instead of solid color -->
     <RelativeLayout
@@ -344,7 +344,7 @@
                         <ImageView
                             android:layout_width="24dp"
                             android:layout_height="24dp"
-                            android:src="@drawable/ic_notification"
+                            android:src="@drawable/ic_route"
                             app:tint="#666666"/>
 
                         <TextView
@@ -352,15 +352,16 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
-                            android:text="Notifications"
+                            android:text="My Routes "
                             android:textColor="#2C2C2C"
                             android:textSize="16sp"/>
+                        <ImageView
+                            android:id="@+id/my_routes_icon"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_right"
+                            app:tint="#CCCCCC"/>
 
-                        <Switch
-                            android:id="@+id/notifications_switch"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"/>
                     </LinearLayout>
 
                     <!-- App Settings Header -->
