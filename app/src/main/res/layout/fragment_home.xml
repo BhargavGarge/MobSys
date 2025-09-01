@@ -49,21 +49,7 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="24dp">
 
-                    <!-- Profile Avatar -->
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        app:cardCornerRadius="24dp"
-                        app:cardElevation="4dp">
 
-                        <ImageView
-                            android:id="@+id/profile_avatar"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/ic_person" />
-
-                    </androidx.cardview.widget.CardView>
 
                     <!-- Welcome Message -->
                     <LinearLayout

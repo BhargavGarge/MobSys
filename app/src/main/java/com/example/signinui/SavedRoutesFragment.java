@@ -1,11 +1,10 @@
 package com.example.signinui;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -14,22 +13,32 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.signinui.model.TrailDetails;
-import com.google.gson.Gson;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class SavedRoutesFragment extends Fragment {
 
     private RecyclerView recyclerView;
     private RoutesAdapter adapter;
-    private final Gson gson = new Gson();
+    private DatabaseReference mDatabase;
+    private FirebaseAuth mAuth;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_routes_list, container, false);
+
+        // Initialize Firebase
+        mAuth = FirebaseAuth.getInstance();
+        mDatabase = FirebaseDatabase.getInstance().getReference();
 
         recyclerView = view.findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -40,23 +49,31 @@ public class SavedRoutesFragment extends Fragment {
     }
 
     private void loadSavedRoutes() {
-        SharedPreferences prefs = requireContext().getSharedPreferences("saved_trails", Context.MODE_PRIVATE);
-        List<TrailDetails> trails = new ArrayList<>();
-
-        Map<String, ?> allEntries = prefs.getAll();
-        for (Map.Entry<String, ?> entry : allEntries.entrySet()) {
-            // --- FIX STARTS HERE ---
-            // Check if the value is actually a String before trying to use it.
-            if (entry.getValue() instanceof String) {
-                String json = (String) entry.getValue();
-                TrailDetails trail = gson.fromJson(json, TrailDetails.class);
-                trails.add(trail);
-            }
-            // This will now safely ignore any non-String entries.
-            // --- FIX ENDS HERE ---
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(getContext(), "Please log in to view saved routes", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        adapter = new RoutesAdapter(trails);
-        recyclerView.setAdapter(adapter);
+        mDatabase.child("saved_trails").child(currentUser.getUid())
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        List<TrailDetails> trails = new ArrayList<>();
+                        for (DataSnapshot trailSnapshot : snapshot.getChildren()) {
+                            TrailDetails trail = trailSnapshot.getValue(TrailDetails.class);
+                            if (trail != null) {
+                                trails.add(trail);
+                            }
+                        }
+                        adapter = new RoutesAdapter(trails);
+                        recyclerView.setAdapter(adapter);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Toast.makeText(getContext(), "Failed to load saved routes", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 }

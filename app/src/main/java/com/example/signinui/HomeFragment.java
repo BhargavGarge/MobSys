@@ -18,6 +18,13 @@ import androidx.fragment.app.Fragment;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -31,7 +38,8 @@ public class HomeFragment extends Fragment {
     private ImageView weatherIcon;
     private TextView temperatureText;
     private TextView userNameHero;
-
+    private DatabaseReference mDatabase;
+    private FirebaseAuth mAuth;
     // Replace with your OpenWeatherMap API key
     private static final String API_KEY = "9bd3c0f117e2da1a013b82af5e348ba8";
     private static final String BASE_URL = "https://api.openweathermap.org/data/2.5/";
@@ -41,10 +49,17 @@ public class HomeFragment extends Fragment {
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_home, container, false);
 
+        // Initialize Firebase
+        mAuth = FirebaseAuth.getInstance();
+        mDatabase = FirebaseDatabase.getInstance().getReference();
+
         // Initialize views
         weatherIcon = view.findViewById(R.id.weather_icon);
         temperatureText = view.findViewById(R.id.temperature_text);
         userNameHero = view.findViewById(R.id.user_name_hero);
+
+        // Load user data
+        loadUserData();
 
         // Initialize location client
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
@@ -63,6 +78,27 @@ public class HomeFragment extends Fragment {
         }
 
         return view;
+    }
+    private void loadUserData() {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser != null) {
+            mDatabase.child("users").child(currentUser.getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        String userName = snapshot.child("name").getValue(String.class);
+                        if (userName != null) {
+                            userNameHero.setText("Welcome, " + userName + "!");
+                        }
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(requireContext(), "Failed to load user data", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
 
     @Override

@@ -10,7 +10,11 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.signinui.model.User;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class SignActivity extends AppCompatActivity {
 
@@ -18,6 +22,7 @@ public class SignActivity extends AppCompatActivity {
     private Button btnSignUp;
     private TextView btnGoToLogin;
     private FirebaseAuth mAuth;
+    private DatabaseReference mDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,8 +36,9 @@ public class SignActivity extends AppCompatActivity {
         btnSignUp = findViewById(R.id.btnSignUp);
         btnGoToLogin = findViewById(R.id.btnGoToLogin);
 
-        // Initialize Firebase Auth
+        // Initialize Firebase Auth and Database
         mAuth = FirebaseAuth.getInstance();
+        mDatabase = FirebaseDatabase.getInstance().getReference();
 
         btnSignUp.setOnClickListener(v -> {
             // Get text input
@@ -71,9 +77,21 @@ public class SignActivity extends AppCompatActivity {
             mAuth.createUserWithEmailAndPassword(email, password)
                     .addOnCompleteListener(task -> {
                         if (task.isSuccessful()) {
-                            Toast.makeText(SignActivity.this, "User registered successfully", Toast.LENGTH_SHORT).show();
-                            startActivity(new Intent(SignActivity.this, MainActivity.class));
-                            finish();
+                            FirebaseUser firebaseUser = mAuth.getCurrentUser();
+                            if (firebaseUser != null) {
+                                // Save user data to Realtime Database
+                                User user = new User(firebaseUser.getUid(), name, email);
+                                mDatabase.child("users").child(firebaseUser.getUid()).setValue(user)
+                                        .addOnCompleteListener(dbTask -> {
+                                            if (dbTask.isSuccessful()) {
+                                                Toast.makeText(SignActivity.this, "User registered successfully", Toast.LENGTH_SHORT).show();
+                                                startActivity(new Intent(SignActivity.this, MainActivity.class));
+                                                finish();
+                                            } else {
+                                                Toast.makeText(SignActivity.this, "Error saving user data: " + dbTask.getException().getMessage(), Toast.LENGTH_LONG).show();
+                                            }
+                                        });
+                            }
                         } else {
                             Toast.makeText(SignActivity.this, "Error: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
                         }

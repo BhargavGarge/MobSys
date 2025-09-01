@@ -44,6 +44,13 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -514,15 +521,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         return details;
     }
 
-    // NEW: Method to load the initial liked/saved state from SharedPreferences
-    private void loadInitialTrailStatus(TrailDetails details) {
-        if (details.id == null || requireContext() == null) return;
-        SharedPreferences savedPrefs = requireContext().getSharedPreferences("saved_trails", Context.MODE_PRIVATE);
-        details.isSaved = savedPrefs.contains(details.id);
 
-        SharedPreferences likedPrefs = requireContext().getSharedPreferences("liked_trails", Context.MODE_PRIVATE);
-        details.isLiked = likedPrefs.contains(details.id);
-    }
 
     private void showTrailDetailsDialog(String placeId, TrailDetails details) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -597,33 +596,62 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
         negativeButton.setTextColor(Color.parseColor("#757575"));
     }
-
-    // FIXED: Save the entire TrailDetails object as a JSON string
     private void saveTrailStatus(TrailDetails details) {
-        SharedPreferences prefs = requireContext().getSharedPreferences("saved_trails", Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-
-        if (details.isSaved) {
-            String json = gson.toJson(details);
-            editor.putString(details.id, json);
-        } else {
-            editor.remove(details.id);
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            DatabaseReference dbRef = FirebaseDatabase.getInstance().getReference();
+            if (details.isSaved) {
+                dbRef.child("saved_trails").child(currentUser.getUid()).child(details.id).setValue(details);
+            } else {
+                dbRef.child("saved_trails").child(currentUser.getUid()).child(details.id).removeValue();
+            }
         }
-        editor.apply();
     }
 
-    // FIXED: Save the entire TrailDetails object as a JSON string
     private void saveTrailLikeStatus(TrailDetails details) {
-        SharedPreferences prefs = requireContext().getSharedPreferences("liked_trails", Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-
-        if (details.isLiked) {
-            String json = gson.toJson(details);
-            editor.putString(details.id, json);
-        } else {
-            editor.remove(details.id);
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            DatabaseReference dbRef = FirebaseDatabase.getInstance().getReference();
+            if (details.isLiked) {
+                dbRef.child("liked_trails").child(currentUser.getUid()).child(details.id).setValue(details);
+            } else {
+                dbRef.child("liked_trails").child(currentUser.getUid()).child(details.id).removeValue();
+            }
         }
-        editor.apply();
+    }
+    private void loadInitialTrailStatus(TrailDetails details) {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null && details.id != null) {
+            DatabaseReference dbRef = FirebaseDatabase.getInstance().getReference();
+
+            // Check if saved
+            dbRef.child("saved_trails").child(currentUser.getUid()).child(details.id)
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            details.isSaved = snapshot.exists();
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "Error checking saved status", error.toException());
+                        }
+                    });
+
+            // Check if liked
+            dbRef.child("liked_trails").child(currentUser.getUid()).child(details.id)
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            details.isLiked = snapshot.exists();
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "Error checking liked status", error.toException());
+                        }
+                    });
+        }
     }
 
     private void startNavigation(TrailDetails details) {
