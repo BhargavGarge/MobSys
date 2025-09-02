@@ -5,14 +5,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#F1F5F9"
-
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        >
+        android:orientation="vertical">
 
         <!-- Hero Map Section with Adventure Header -->
         <FrameLayout
@@ -38,7 +36,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-
                 android:padding="20dp">
 
                 <!-- Top Navigation Bar -->
@@ -48,8 +45,6 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:layout_marginBottom="24dp">
-
-
 
                     <!-- Welcome Message -->
                     <LinearLayout
@@ -76,64 +71,42 @@
                             android:textSize="24sp"
                             android:textStyle="bold"
                             android:fontFamily="serif" />
-
                     </LinearLayout>
 
                     <!-- Weather & Notifications -->
-                    <LinearLayout
+                    <androidx.cardview.widget.CardView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:layout_marginEnd="12dp"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="6dp"
+                        app:cardBackgroundColor="#80FFFFFF">
 
-                        <!-- Enhanced Weather Widget -->
-                        <androidx.cardview.widget.CardView
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="12dp"
-                            app:cardCornerRadius="20dp"
-                            app:cardElevation="6dp"
-                            app:cardBackgroundColor="#80FFFFFF">
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
 
-                            <LinearLayout
+                            <ImageView
+                                android:id="@+id/weather_icon"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_sunny"
+                                app:tint="#FFFF00" />
+
+                            <TextView
+                                android:id="@+id/temperature_text"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical"
-                                android:padding="12dp">
-
-                                <ImageView
-                                    android:id="@+id/weather_icon"
-                                    android:layout_width="24dp"
-                                    android:layout_height="24dp"
-                                    android:src="@drawable/ic_sunny"
-                                    app:tint="#FFFF00" />
-
-                                <LinearLayout
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:id="@+id/temperature_text"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="22°C"
-                                        android:textColor="#475569"
-                                        android:textSize="16sp"
-                                        android:textStyle="bold" />
-
-                                </LinearLayout>
-
-                            </LinearLayout>
-
-                        </androidx.cardview.widget.CardView>
-
-
-
-                    </LinearLayout>
-
+                                android:layout_marginStart="8dp"
+                                android:text="22°C"
+                                android:textColor="#475569"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
                 </LinearLayout>
 
                 <!-- Adventure Stats -->
@@ -168,7 +141,6 @@
                             android:textColor="#FFFFFF"
                             android:textSize="14sp"
                             android:alpha="0.9" />
-
                     </LinearLayout>
 
                     <!-- Elevation Stat -->
@@ -195,7 +167,6 @@
                             android:textColor="#FFFFFF"
                             android:textSize="14sp"
                             android:alpha="0.9" />
-
                     </LinearLayout>
 
                     <!-- Adventures Stat -->
@@ -222,19 +193,12 @@
                             android:textColor="#FFFFFF"
                             android:textSize="14sp"
                             android:alpha="0.9" />
-
                     </LinearLayout>
-
                 </LinearLayout>
-
-                <!-- Quick Search -->
-
-
             </LinearLayout>
-
         </FrameLayout>
 
-        <!-- Adventure Quick Actions with Stunning Visuals -->
+        <!-- Adventure Quick Actions -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -466,7 +430,7 @@
 
         </LinearLayout>
 
-        <!-- Featured Routes with Gorgeous Imagery -->
+        <!-- Featured Routes with RecyclerView -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -502,506 +466,19 @@
                     android:textColor="#059669"
                     android:textSize="16sp"
                     android:textStyle="bold" />
-
             </LinearLayout>
 
-            <!-- Featured Routes Horizontal Scroll -->
-            <HorizontalScrollView
+            <!-- Dynamic RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/featured_routes_recycler"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <!-- Featured Route 1 -->
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/featured_route_1"
-                        android:layout_width="280dp"
-                        android:layout_height="200dp"
-                        android:layout_marginEnd="16dp"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="12dp">
-
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent">
-
-                            <ImageView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/img_1" />
-
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/featured_gradient_overlay" />
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="?android:attr/selectableItemBackground"
-                                android:orientation="vertical"
-                                android:padding="20dp">
-
-                                <!-- Route Badge -->
-                                <androidx.cardview.widget.CardView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    app:cardCornerRadius="12dp"
-                                    app:cardElevation="4dp"
-                                    app:cardBackgroundColor="#059669">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="HIKING"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="12sp"
-                                        android:textStyle="bold"
-                                        android:paddingStart="12dp"
-                                        android:paddingEnd="12dp"
-                                        android:paddingTop="6dp"
-                                        android:paddingBottom="6dp" />
-
-                                </androidx.cardview.widget.CardView>
-
-                                <View
-                                    android:layout_width="0dp"
-                                    android:layout_height="0dp"
-                                    android:layout_weight="1" />
-
-                                <!-- Route Info -->
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="Alpine Lake Trail"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="20sp"
-                                        android:textStyle="bold"
-                                        android:fontFamily="serif" />
-
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:orientation="horizontal">
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_distance"
-                                                app:tint="#FFFFFF" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="6dp"
-                                                android:text="12.5 km"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:alpha="0.9" />
-
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_elevation"
-                                                app:tint="#FFFFFF" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="6dp"
-                                                android:text="850m ↗"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:alpha="0.9" />
-
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_star"
-                                                app:tint="#F59E0B" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="4dp"
-                                                android:text="4.8"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:textStyle="bold" />
-
-                                        </LinearLayout>
-
-                                    </LinearLayout>
-
-                                </LinearLayout>
-
-                            </LinearLayout>
-
-                        </FrameLayout>
-
-                    </androidx.cardview.widget.CardView>
-
-                    <!-- Featured Route 2 -->
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/featured_route_2"
-                        android:layout_width="280dp"
-                        android:layout_height="200dp"
-                        android:layout_marginEnd="16dp"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="12dp">
-
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent">
-
-                            <ImageView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/img_2" />
-
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/featured_gradient_overlay" />
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="?android:attr/selectableItemBackground"
-                                android:orientation="vertical"
-                                android:padding="20dp">
-
-                                <!-- Route Badge -->
-                                <androidx.cardview.widget.CardView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    app:cardCornerRadius="12dp"
-                                    app:cardElevation="4dp"
-                                    app:cardBackgroundColor="#10B981">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="CYCLING"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="12sp"
-                                        android:textStyle="bold"
-                                        android:paddingStart="12dp"
-                                        android:paddingEnd="12dp"
-                                        android:paddingTop="6dp"
-                                        android:paddingBottom="6dp" />
-
-                                </androidx.cardview.widget.CardView>
-
-                                <View
-                                    android:layout_width="0dp"
-                                    android:layout_height="0dp"
-                                    android:layout_weight="1" />
-
-                                <!-- Route Info -->
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="Coastal Ride"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="20sp"
-                                        android:textStyle="bold"
-                                        android:fontFamily="serif" />
-
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:orientation="horizontal">
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_distance"
-                                                app:tint="#FFFFFF" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="6dp"
-                                                android:text="28.3 km"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:alpha="0.9" />
-
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_elevation"
-                                                app:tint="#FFFFFF" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="6dp"
-                                                android:text="320m ↗"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:alpha="0.9" />
-
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_star"
-                                                app:tint="#F59E0B" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="4dp"
-                                                android:text="4.6"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:textStyle="bold" />
-
-                                        </LinearLayout>
-
-                                    </LinearLayout>
-
-                                </LinearLayout>
-
-                            </LinearLayout>
-
-                        </FrameLayout>
-
-                    </androidx.cardview.widget.CardView>
-
-                    <!-- Featured Route 3 -->
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/featured_route_3"
-                        android:layout_width="280dp"
-                        android:layout_height="200dp"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="12dp">
-
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent">
-
-                            <ImageView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/img_3" />
-
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/featured_gradient_overlay" />
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="?android:attr/selectableItemBackground"
-                                android:orientation="vertical"
-                                android:padding="20dp">
-
-                                <!-- Route Badge -->
-                                <androidx.cardview.widget.CardView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    app:cardCornerRadius="12dp"
-                                    app:cardElevation="4dp"
-                                    app:cardBackgroundColor="#D97706">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="RUNNING"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="12sp"
-                                        android:textStyle="bold"
-                                        android:paddingStart="12dp"
-                                        android:paddingEnd="12dp"
-                                        android:paddingTop="6dp"
-                                        android:paddingBottom="6dp" />
-
-                                </androidx.cardview.widget.CardView>
-
-                                <View
-                                    android:layout_width="0dp"
-                                    android:layout_height="0dp"
-                                    android:layout_weight="1" />
-
-                                <!-- Route Info -->
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="Forest Loop"
-                                        android:textColor="#FFFFFF"
-                                        android:textSize="20sp"
-                                        android:textStyle="bold"
-                                        android:fontFamily="serif" />
-
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:orientation="horizontal">
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_distance"
-                                                app:tint="#FFFFFF" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="6dp"
-                                                android:text="8.2 km"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:alpha="0.9" />
-
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_elevation"
-                                                app:tint="#FFFFFF" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="6dp"
-                                                android:text="180m ↗"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:alpha="0.9" />
-
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:orientation="horizontal"
-                                            android:gravity="center_vertical">
-
-                                            <ImageView
-                                                android:layout_width="16dp"
-                                                android:layout_height="16dp"
-                                                android:src="@drawable/ic_star"
-                                                app:tint="#F59E0B" />
-
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginStart="4dp"
-                                                android:text="4.9"
-                                                android:textColor="#FFFFFF"
-                                                android:textSize="14sp"
-                                                android:textStyle="bold" />
-
-                                        </LinearLayout>
-
-                                    </LinearLayout>
-
-                                </LinearLayout>
-
-                            </LinearLayout>
-
-                        </FrameLayout>
-
-                    </androidx.cardview.widget.CardView>
-
-                </LinearLayout>
-
-            </HorizontalScrollView>
-
+                android:overScrollMode="never"
+                android:clipToPadding="false"
+                tools:listitem="@layout/item_featured_route"/>
         </LinearLayout>
 
-        <!-- Social Activity Feed -->
+        <!-- Friends' Adventures Section (unchanged) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -1388,12 +865,9 @@
             </LinearLayout>
 
         </LinearLayout>
-
-        <!-- Bottom Padding for Navigation -->
+        <!-- Bottom Padding -->
         <View
             android:layout_width="match_parent"
             android:layout_height="100dp" />
-
     </LinearLayout>
-
 </ScrollView>

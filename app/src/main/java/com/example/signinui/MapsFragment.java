@@ -9,8 +9,13 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.preference.PreferenceManager;
@@ -84,7 +89,8 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class MapsFragment extends Fragment implements TextToSpeech.OnInitListener {
+// IMPLEMENT SensorEventListener for the step counter
+public class MapsFragment extends Fragment implements TextToSpeech.OnInitListener, SensorEventListener {
 
     private static final String TAG = "MapsFragment";
     private MapView mapView;
@@ -115,8 +121,14 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     private TextView distanceToNext;
     private TextView remainingDistance;
     private TextView estimatedTime;
+    private TextView stepsCountView; // NEW: TextView for steps
     private ProgressBar navigationProgress;
     private Button stopNavigationButton;
+
+    // Step Counter variables
+    private SensorManager sensorManager;
+    private Sensor stepCounterSensor;
+    private int initialSteps = -1; // To store the step count when navigation starts
 
     // Current location tracking for navigation
     private GeoPoint lastKnownLocation;
@@ -125,17 +137,16 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     private int currentStepIndex = 0;
 
     // Data classes
-    // NOTE: TrailDetails inner class was removed to use the shared model class.
     private static class NavigationData {
         String trailName, trailType;
         List<GeoPoint> routePoints;
-        double totalDistance;
+        double totalDistanceMeters; // MODIFIED: Store distance in meters for accuracy
 
-        NavigationData(String trailName, List<GeoPoint> routePoints, String trailType, double totalDistance) {
+        NavigationData(String trailName, List<GeoPoint> routePoints, String trailType, double totalDistanceMeters) {
             this.trailName = trailName;
             this.routePoints = routePoints;
             this.trailType = trailType;
-            this.totalDistance = totalDistance;
+            this.totalDistanceMeters = totalDistanceMeters;
         }
     }
 
@@ -155,12 +166,25 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
 
     private final ActivityResultLauncher<String[]> requestPermissionsLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> {
-                if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
-                        permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)) {
+                boolean locationGranted = permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+                        permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false);
+
+                if (locationGranted) {
                     enableMyLocationOverlay();
                     findAndCenterOnUserLocation();
                 } else {
                     Toast.makeText(requireContext(), "Location permission denied.", Toast.LENGTH_LONG).show();
+                }
+
+                // Check ACTIVITY_RECOGNITION permission specifically
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    boolean activityRecognitionGranted = permissions.getOrDefault(Manifest.permission.ACTIVITY_RECOGNITION, false);
+                    if (!activityRecognitionGranted) {
+                        Toast.makeText(requireContext(), "Step counting will not be available without Activity Recognition permission.", Toast.LENGTH_LONG).show();
+                    } else {
+                        // Permission granted, you can initialize step counter here if needed
+                        Log.d(TAG, "Activity Recognition permission granted");
+                    }
                 }
             });
 
@@ -178,7 +202,13 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         textToSpeech = new TextToSpeech(requireContext(), this);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
 
-        // *** ENHANCEMENT: Use a topographic map style for an outdoor feel ***
+        // Initialize SensorManager for the step counter
+        sensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        }
+
+
         mapView.setTileSource(TileSourceFactory.OpenTopo);
         mapView.setMultiTouchControls(true);
         mapView.getController().setCenter(new GeoPoint(51.1657, 10.4515));
@@ -188,7 +218,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         addMapOverlays();
         setupTrailTypeSpinner(view);
         checkLocationServices();
-        requestLocationPermissionIfNeeded();
+        requestLocationAndActivityPermissions(); // MODIFIED: Request both permissions
 
         return view;
     }
@@ -199,6 +229,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         distanceToNext = view.findViewById(R.id.distance_to_next);
         remainingDistance = view.findViewById(R.id.remaining_distance);
         estimatedTime = view.findViewById(R.id.estimated_time);
+        stepsCountView = view.findViewById(R.id.steps_count); // NEW: Initialize step counter TextView
         navigationProgress = view.findViewById(R.id.navigation_progress);
         stopNavigationButton = view.findViewById(R.id.stop_navigation_button);
         if (stopNavigationButton != null) {
@@ -220,6 +251,282 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             Log.e(TAG, "TTS initialization failed");
         }
     }
+
+    // NEW: Method to request all needed permissions together
+    private void requestLocationAndActivityPermissions() {
+        List<String> permissionsToRequest = new ArrayList<>();
+
+        // Always request location permissions
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+
+        // Only request ACTIVITY_RECOGNITION for Android 10+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION);
+            }
+        }
+
+        if (hasLocationPermissions()) {
+            enableMyLocationOverlay();
+            findAndCenterOnUserLocation();
+        }
+
+        if (!permissionsToRequest.isEmpty()) {
+            requestPermissionsLauncher.launch(permissionsToRequest.toArray(new String[0]));
+        }
+    }
+
+    private void fetchRealRouteAndStartNavigation(TrailDetails details) {
+        if (lastKnownLocation == null || details.routePoints.isEmpty()) {
+            Toast.makeText(requireContext(), "Cannot determine start or end point for navigation.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        GeoPoint startPoint = lastKnownLocation;
+        GeoPoint endPoint = details.routePoints.get(0);
+
+        String apiKey = getString(R.string.ors_api_key);
+        String url = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
+
+        String postBody = String.format(Locale.US,
+                "{\"coordinates\":[[%f,%f],[%f,%f]]}",
+                startPoint.getLongitude(), startPoint.getLatitude(),
+                endPoint.getLongitude(), endPoint.getLatitude()
+        );
+
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(postBody, okhttp3.MediaType.parse("application/json; charset=utf-8"));
+        Request request = new Request.Builder()
+                .url(url)
+                .header("Authorization", apiKey)
+                .post(body)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.e(TAG, "Openrouteservice fetch failed", e);
+                requireActivity().runOnUiThread(() ->
+                        Toast.makeText(requireContext(), "Failed to calculate route.", Toast.LENGTH_SHORT).show()
+                );
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Log.e(TAG, "Openrouteservice response error: " + response.code() + " " + response.message());
+                    return;
+                }
+
+                try {
+                    String responseData = response.body().string();
+                    JsonObject json = gson.fromJson(responseData, JsonObject.class);
+
+                    JsonArray features = json.getAsJsonArray("features");
+                    if (features == null || features.size() == 0) return;
+
+                    JsonObject feature = features.get(0).getAsJsonObject();
+                    JsonObject properties = feature.getAsJsonObject("properties");
+                    JsonObject summary = properties.getAsJsonArray("segments").get(0).getAsJsonObject();
+                    JsonObject geometry = feature.getAsJsonObject("geometry");
+
+                    // FIXED: Get REAL distance from the API response (it's in meters)
+                    double realTotalDistanceMeters = summary.get("distance").getAsDouble();
+
+                    JsonArray stepsJson = summary.getAsJsonArray("steps");
+                    JsonArray coordinates = geometry.getAsJsonArray("coordinates");
+
+                    List<GeoPoint> routePoints = new ArrayList<>();
+                    for (JsonElement coord : coordinates) {
+                        JsonArray lonLat = coord.getAsJsonArray();
+                        routePoints.add(new GeoPoint(lonLat.get(1).getAsDouble(), lonLat.get(0).getAsDouble()));
+                    }
+
+                    List<NavigationStep> navigationSteps = parseOrsSteps(stepsJson, routePoints);
+
+                    requireActivity().runOnUiThread(() -> {
+                        // Pass the real distance to the navigation method
+                        startNavigationWithRealData(details, routePoints, navigationSteps, realTotalDistanceMeters);
+                    });
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing ORS response", e);
+                }
+            }
+        });
+    }
+
+    private void startNavigationWithRealData(TrailDetails details, List<GeoPoint> realRoutePoints, List<NavigationStep> realSteps, double totalDistanceMeters) {
+        try {
+            if (realRoutePoints.size() < 2) {
+                Toast.makeText(requireContext(), "Invalid route data received.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            isNavigating = true;
+            // FIXED: Use the real distance from the API
+            currentNavigation = new NavigationData(
+                    details.name,
+                    realRoutePoints,
+                    details.type,
+                    totalDistanceMeters
+            );
+
+            this.navigationSteps = realSteps;
+            this.currentStepIndex = 0;
+
+            if (navigationPanel != null) {
+                navigationPanel.setVisibility(View.VISIBLE);
+            }
+
+            // Start the step counter
+            startStepCounter();
+
+            drawNavigationRoute(realRoutePoints);
+            startNavigationLocationUpdates();
+            updateNavigationUI();
+
+            Toast.makeText(requireContext(), "Navigation started for " + details.name, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting navigation with real data", e);
+        }
+    }
+
+
+    private void updateNavigationUI() {
+        if (navigationSteps == null || currentStepIndex >= navigationSteps.size() || !isNavigating) {
+            return;
+        }
+
+        final NavigationStep currentStep = navigationSteps.get(currentStepIndex);
+
+        requireActivity().runOnUiThread(() -> {
+            navigationInstruction.setText(currentStep.instruction);
+
+            double distanceToNextStep = calculateDistance(lastKnownLocation, currentStep.point);
+            distanceToNext.setText(String.format(Locale.US, "%.0f m", distanceToNextStep));
+
+            double remainingDist = calculateRemainingDistance();
+            remainingDistance.setText(String.format(Locale.US, "%.1f km", remainingDist / 1000));
+
+            // Estimate time based on a standard hiking speed (e.g., 5 km/h)
+            int minutes = (int) ((remainingDist / 1000) / 5 * 60);
+            estimatedTime.setText(String.format(Locale.US, "%d min", minutes));
+
+            // FIXED: Progress bar calculation based on real distance
+            double totalDistance = currentNavigation.totalDistanceMeters;
+            if (totalDistance > 0) {
+                double traveled = totalDistance - remainingDist;
+                int progress = (int) ((traveled / totalDistance) * 100);
+                navigationProgress.setProgress(Math.max(0, Math.min(100, progress)));
+            }
+        });
+    }
+
+
+    private void stopNavigation() {
+        isNavigating = false;
+        currentNavigation = null;
+        if (navigationRoute != null) {
+            mapView.getOverlays().remove(navigationRoute);
+            navigationRoute = null;
+        }
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+            navigationLocationCallback = null;
+        }
+        if (navigationPanel != null) {
+            navigationPanel.setVisibility(View.GONE);
+        }
+
+        // Stop the step counter
+        stopStepCounter();
+
+        mapView.invalidate();
+        Toast.makeText(requireContext(), "Navigation stopped", Toast.LENGTH_SHORT).show();
+    }
+
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+        }
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+        }
+        // Make sure to unregister the sensor listener
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+        mapView.onDetach();
+    }
+
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Unregister listener to save battery when the app is not in the foreground
+        if (isNavigating) {
+            sensorManager.unregisterListener(this);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Re-register listener when the app comes back to the foreground
+        if (isNavigating && stepCounterSensor != null) {
+            sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
+        }
+    }
+
+
+    // --- SENSOR EVENT LISTENER METHODS FOR STEP COUNTER ---
+
+    private void startStepCounter() {
+        if (stepCounterSensor == null) {
+            Toast.makeText(requireContext(), "Step counter sensor not available.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        initialSteps = -1; // Reset on each new navigation
+        stepsCountView.setText("Steps: 0"); // Reset UI
+        sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
+    }
+
+    private void stopStepCounter() {
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            if (initialSteps == -1) {
+                // This is the first event we receive. Store the current step count as the baseline.
+                initialSteps = (int) event.values[0];
+            }
+            // Calculate steps taken since navigation started
+            int currentSteps = (int) event.values[0] - initialSteps;
+            if (stepsCountView != null) {
+                stepsCountView.setText(String.format(Locale.US, "Steps: %d", currentSteps));
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // Not needed for this implementation
+    }
+
+    // --- UNCHANGED METHODS BELOW ---
+    // (I've collapsed them for brevity, but they are included in the final code block)
 
     private void setupTrailTypeSpinner(View view) {
         trailTypeSpinner = view.findViewById(R.id.trail_type_spinner);
@@ -287,7 +594,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         }
         mapView.invalidate();
     }
-
     private boolean shouldShowMarker(String category) {
         if (category == null) return currentFilter.equals("all");
         String lc = category.toLowerCase();
@@ -338,15 +644,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                     .setMessage("Please enable GPS or Network location in your device settings.")
                     .setPositiveButton("OK", null)
                     .show();
-        }
-    }
-
-    private void requestLocationPermissionIfNeeded() {
-        if (hasLocationPermissions()) {
-            enableMyLocationOverlay();
-            findAndCenterOnUserLocation();
-        } else {
-            requestPermissionsLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION});
         }
     }
 
@@ -480,7 +777,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                 String placeId = place.get("place_id").getAsString();
                 double rating = place.has("rating") ? place.get("rating").getAsDouble() : 0.0;
 
-                // FIXED: Pass placeId to generateTrailDetails and load initial status
                 TrailDetails details = generateTrailDetails(placeId, name, category, rating, gp);
                 loadInitialTrailStatus(details);
 
@@ -504,7 +800,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         mapView.invalidate();
     }
 
-    // FIXED: generateTrailDetails now accepts an ID
     private TrailDetails generateTrailDetails(String id, String name, String category, double rating, GeoPoint startPoint) {
         Random random = new Random();
         String[] difficulties = {"Easy", "Moderate", "Challenging"};
@@ -515,13 +810,10 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         String description = "A scenic " + category + " trail rated as " + difficulty + ".";
         double finalRating = (rating == 0.0) ? (3.0 + random.nextDouble() * 2.0) : rating;
 
-        // Use the constructor from the shared model class
         TrailDetails details = new TrailDetails(id, name, description, difficulty, distance, elevation, category, finalRating, "Near you");
         details.routePoints.add(startPoint);
         return details;
     }
-
-
 
     private void showTrailDetailsDialog(String placeId, TrailDetails details) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -542,14 +834,11 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         descriptionView.setPadding(0, 20, 0, 20);
         layout.addView(descriptionView);
 
-        // Create Like and Save buttons
         LinearLayout buttonLayout = new LinearLayout(requireContext());
         buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
         buttonLayout.setGravity(Gravity.CENTER);
 
-        // Like button
         ImageButton likeButton = new ImageButton(requireContext());
-        // FIXED: Set initial state correctly based on loaded details.isLiked
         likeButton.setImageResource(details.isLiked ? R.drawable.ic_fav_border : R.drawable.ic_fav);
         likeButton.setBackground(null);
         likeButton.setColorFilter(Color.parseColor(details.isLiked ? "#FF4081" : "#757575"));
@@ -561,9 +850,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             Toast.makeText(requireContext(), details.isLiked ? "Trail liked!" : "Trail unliked", Toast.LENGTH_SHORT).show();
         });
 
-        // Save button
         ImageButton saveButton = new ImageButton(requireContext());
-        // FIXED: Set initial state correctly based on loaded details.isSaved
         saveButton.setImageResource(details.isSaved ? R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_outline);
         saveButton.setBackground(null);
         saveButton.setColorFilter(Color.parseColor(details.isSaved ? "#3F51B5" : "#757575"));
@@ -575,7 +862,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             Toast.makeText(requireContext(), details.isSaved ? "Trail saved!" : "Trail removed", Toast.LENGTH_SHORT).show();
         });
 
-        // Add buttons to layout
         buttonLayout.addView(likeButton, new LinearLayout.LayoutParams(100, 100));
         buttonLayout.addView(saveButton, new LinearLayout.LayoutParams(100, 100));
 
@@ -588,7 +874,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         AlertDialog dialog = builder.create();
         dialog.show();
 
-        // Customize button colors
         Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
         positiveButton.setTextColor(Color.WHITE);
         positiveButton.setBackgroundColor(Color.parseColor("#4CAF50"));
@@ -624,7 +909,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         if (currentUser != null && details.id != null) {
             DatabaseReference dbRef = FirebaseDatabase.getInstance().getReference();
 
-            // Check if saved
             dbRef.child("saved_trails").child(currentUser.getUid()).child(details.id)
                     .addListenerForSingleValueEvent(new ValueEventListener() {
                         @Override
@@ -638,7 +922,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                         }
                     });
 
-            // Check if liked
             dbRef.child("liked_trails").child(currentUser.getUid()).child(details.id)
                     .addListenerForSingleValueEvent(new ValueEventListener() {
                         @Override
@@ -657,85 +940,10 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     private void startNavigation(TrailDetails details) {
         if (!hasLocationPermissions()) {
             Toast.makeText(requireContext(), "Location permission required for navigation", Toast.LENGTH_SHORT).show();
-            requestLocationPermissionIfNeeded();
+            requestLocationAndActivityPermissions();
             return;
         }
         fetchRealRouteAndStartNavigation(details);
-    }
-
-    private void fetchRealRouteAndStartNavigation(TrailDetails details) {
-        if (lastKnownLocation == null || details.routePoints.isEmpty()) {
-            Toast.makeText(requireContext(), "Cannot determine start or end point for navigation.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        GeoPoint startPoint = lastKnownLocation;
-        GeoPoint endPoint = details.routePoints.get(0);
-
-        String apiKey = getString(R.string.ors_api_key);
-        String url = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
-
-        String postBody = String.format(Locale.US,
-                "{\"coordinates\":[[%f,%f],[%f,%f]]}",
-                startPoint.getLongitude(), startPoint.getLatitude(),
-                endPoint.getLongitude(), endPoint.getLatitude()
-        );
-
-        okhttp3.RequestBody body = okhttp3.RequestBody.create(postBody, okhttp3.MediaType.parse("application/json; charset=utf-8"));
-        Request request = new Request.Builder()
-                .url(url)
-                .header("Authorization", apiKey)
-                .post(body)
-                .build();
-
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                Log.e(TAG, "Openrouteservice fetch failed", e);
-                requireActivity().runOnUiThread(() ->
-                        Toast.makeText(requireContext(), "Failed to calculate route.", Toast.LENGTH_SHORT).show()
-                );
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                if (!response.isSuccessful() || response.body() == null) {
-                    Log.e(TAG, "Openrouteservice response error: " + response.code() + " " + response.message());
-                    return;
-                }
-
-                try {
-                    String responseData = response.body().string();
-                    JsonObject json = gson.fromJson(responseData, JsonObject.class);
-
-                    JsonArray features = json.getAsJsonArray("features");
-                    if (features == null || features.size() == 0) return;
-
-                    JsonObject feature = features.get(0).getAsJsonObject();
-                    JsonObject properties = feature.getAsJsonObject("properties");
-                    JsonObject geometry = feature.getAsJsonObject("geometry");
-
-                    JsonArray segments = properties.getAsJsonArray("segments");
-                    JsonArray stepsJson = segments.get(0).getAsJsonObject().getAsJsonArray("steps");
-                    JsonArray coordinates = geometry.getAsJsonArray("coordinates");
-
-                    List<GeoPoint> routePoints = new ArrayList<>();
-                    for (JsonElement coord : coordinates) {
-                        JsonArray lonLat = coord.getAsJsonArray();
-                        routePoints.add(new GeoPoint(lonLat.get(1).getAsDouble(), lonLat.get(0).getAsDouble()));
-                    }
-
-                    List<NavigationStep> navigationSteps = parseOrsSteps(stepsJson, routePoints);
-
-                    requireActivity().runOnUiThread(() -> {
-                        startNavigationWithRealData(details, routePoints, navigationSteps);
-                    });
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error parsing ORS response", e);
-                }
-            }
-        });
     }
 
     private List<NavigationStep> parseOrsSteps(JsonArray stepsJson, List<GeoPoint> routePoints) {
@@ -752,37 +960,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             steps.add(new NavigationStep(stepLocation, instruction, distance, ""));
         }
         return steps;
-    }
-
-    private void startNavigationWithRealData(TrailDetails details, List<GeoPoint> realRoutePoints, List<NavigationStep> realSteps) {
-        try {
-            if (realRoutePoints.size() < 2) {
-                Toast.makeText(requireContext(), "Invalid route data received.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            isNavigating = true;
-            currentNavigation = new NavigationData(
-                    details.name,
-                    realRoutePoints,
-                    details.type,
-                    Double.parseDouble(details.distance.replace(" km", ""))
-            );
-
-            this.navigationSteps = realSteps;
-            this.currentStepIndex = 0;
-
-            if (navigationPanel != null) {
-                navigationPanel.setVisibility(View.VISIBLE);
-            }
-
-            drawNavigationRoute(realRoutePoints);
-            startNavigationLocationUpdates();
-            updateNavigationUI();
-
-            Toast.makeText(requireContext(), "Navigation started for " + details.name, Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "Error starting navigation with real data", e);
-        }
     }
 
     private void drawNavigationRoute(List<GeoPoint> routePoints) {
@@ -845,34 +1022,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         updateNavigationUI();
     }
 
-    private void updateNavigationUI() {
-        if (navigationSteps == null || currentStepIndex >= navigationSteps.size() || !isNavigating) {
-            return;
-        }
-
-        final NavigationStep currentStep = navigationSteps.get(currentStepIndex);
-
-        requireActivity().runOnUiThread(() -> {
-            navigationInstruction.setText(currentStep.instruction);
-
-            double distanceToNextStep = calculateDistance(lastKnownLocation, currentStep.point);
-            distanceToNext.setText(String.format(Locale.US, "%.0f m", distanceToNextStep));
-
-            double remainingDist = calculateRemainingDistance();
-            remainingDistance.setText(String.format(Locale.US, "%.1f km", remainingDist / 1000));
-
-            int minutes = (int) ((remainingDist / 1000) / 5 * 60);
-            estimatedTime.setText(String.format(Locale.US, "%d min", minutes));
-
-            double totalDistance = currentNavigation.totalDistance * 1000;
-            if (totalDistance > 0) {
-                double traveled = totalDistance - remainingDist;
-                int progress = (int) ((traveled / totalDistance) * 100);
-                navigationProgress.setProgress(Math.max(0, Math.min(100, progress)));
-            }
-        });
-    }
-
     private double calculateRemainingDistance() {
         if (navigationSteps == null || lastKnownLocation == null || currentStepIndex >= navigationSteps.size()) {
             return 0;
@@ -889,37 +1038,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         float[] results = new float[1];
         Location.distanceBetween(p1.getLatitude(), p1.getLongitude(), p2.getLatitude(), p2.getLongitude(), results);
         return results[0];
-    }
-
-    private void stopNavigation() {
-        isNavigating = false;
-        currentNavigation = null;
-        if (navigationRoute != null) {
-            mapView.getOverlays().remove(navigationRoute);
-            navigationRoute = null;
-        }
-        if (navigationLocationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
-            navigationLocationCallback = null;
-        }
-        if (navigationPanel != null) {
-            navigationPanel.setVisibility(View.GONE);
-        }
-        mapView.invalidate();
-        Toast.makeText(requireContext(), "Navigation stopped", Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (textToSpeech != null) {
-            textToSpeech.stop();
-            textToSpeech.shutdown();
-        }
-        if (navigationLocationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
-        }
-        mapView.onDetach();
     }
 
     private void addInfoRow(LinearLayout parent, String label, String value, int valueColor) {

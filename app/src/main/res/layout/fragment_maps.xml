@@ -45,13 +45,7 @@
                     android:textStyle="bold"
                     android:gravity="center" />
 
-                <ImageButton
-                    android:id="@+id/map_view_btn"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/circle_background_transparent"
-                    android:src="@drawable/ic_map"
-                    app:tint="@android:color/white" />
+
 
             </LinearLayout>
 
@@ -616,10 +610,22 @@
                     android:layout_height="8dp"
                     android:progress="25"
                     android:progressDrawable="@drawable/progress_bar_navigation" />
-
+                <TextView
+                    android:id="@+id/steps_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Steps: 0"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:layout_marginTop="8dp"
+                    android:drawableStart="@drawable/ic_walk"
+                    android:drawablePadding="8dp"
+                    android:gravity="center_vertical"/>
             </LinearLayout>
 
+
         </androidx.cardview.widget.CardView>
+
 
         <!-- Map Fragment -->
         <FrameLayout

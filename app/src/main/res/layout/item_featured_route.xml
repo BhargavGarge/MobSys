@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="280dp"
+    android:layout_height="200dp"
+    android:layout_marginEnd="16dp"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="12dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/route_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/featured_gradient_overlay" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/route_type"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HIKING"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+
+                android:padding="6dp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/route_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Trail Name"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/route_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="10 km | 500m ↗"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:alpha="0.9" />
+
+        </LinearLayout>
+    </FrameLayout>
+</androidx.cardview.widget.CardView>
