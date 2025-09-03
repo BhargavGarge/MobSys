@@ -50,6 +50,9 @@ public class MainActivity extends AppCompatActivity {
             else if (itemId == R.id.nav_steps) {
                 selectedFragment = new StepCounterFragment();
             }
+            else if (itemId == R.id.nav_feed) {
+                selectedFragment = new FeedFragment();
+            }
 
             if (selectedFragment != null) {
                 getSupportFragmentManager().beginTransaction()

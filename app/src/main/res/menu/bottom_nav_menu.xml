@@ -17,4 +17,8 @@
         android:id="@+id/nav_steps"
         android:icon="@drawable/ic_walk"
         android:title="Steps"/>
+    <item
+        android:id="@+id/nav_feed"
+        android:icon="@drawable/ic_feed"
+        android:title="Feed"/>
 </menu>
