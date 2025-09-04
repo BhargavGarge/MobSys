@@ -89,8 +89,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-// IMPLEMENT SensorEventListener for the step counter
 public class MapsFragment extends Fragment implements TextToSpeech.OnInitListener, SensorEventListener {
+    private static final String STEP_PREFS = "StepPreferences";
+    private static final String TOTAL_STEPS_KEY = "total_steps";
+    private static final String CURRENT_LEVEL_KEY = "current_level";
+    private static final String LEVEL_THRESHOLDS_KEY = "level_thresholds";
 
     private static final String TAG = "MapsFragment";
     private MapView mapView;
@@ -121,14 +124,15 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     private TextView distanceToNext;
     private TextView remainingDistance;
     private TextView estimatedTime;
-    private TextView stepsCountView; // NEW: TextView for steps
+    private TextView stepsCountView;
     private ProgressBar navigationProgress;
     private Button stopNavigationButton;
 
     // Step Counter variables
     private SensorManager sensorManager;
     private Sensor stepCounterSensor;
-    private int initialSteps = -1; // To store the step count when navigation starts
+    private int initialSteps = -1; // Stores the raw sensor value at the start of navigation
+    private int stepsTakenDuringSession = 0; // Stores the calculated steps for the current session
 
     // Current location tracking for navigation
     private GeoPoint lastKnownLocation;
@@ -140,7 +144,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     private static class NavigationData {
         String trailName, trailType;
         List<GeoPoint> routePoints;
-        double totalDistanceMeters; // MODIFIED: Store distance in meters for accuracy
+        double totalDistanceMeters;
 
         NavigationData(String trailName, List<GeoPoint> routePoints, String trailType, double totalDistanceMeters) {
             this.trailName = trailName;
@@ -176,17 +180,29 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                     Toast.makeText(requireContext(), "Location permission denied.", Toast.LENGTH_LONG).show();
                 }
 
-                // Check ACTIVITY_RECOGNITION permission specifically
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     boolean activityRecognitionGranted = permissions.getOrDefault(Manifest.permission.ACTIVITY_RECOGNITION, false);
                     if (!activityRecognitionGranted) {
                         Toast.makeText(requireContext(), "Step counting will not be available without Activity Recognition permission.", Toast.LENGTH_LONG).show();
                     } else {
-                        // Permission granted, you can initialize step counter here if needed
                         Log.d(TAG, "Activity Recognition permission granted");
                     }
                 }
             });
+
+    private void initializeLevelThresholds() {
+        SharedPreferences prefs = requireContext().getSharedPreferences(STEP_PREFS, Context.MODE_PRIVATE);
+        if (!prefs.contains(LEVEL_THRESHOLDS_KEY)) {
+            int[] thresholds = {0, 5000, 15000, 30000, 50000, 75000, 105000, 140000, 180000, 225000};
+            StringBuilder thresholdsStr = new StringBuilder();
+            for (int threshold : thresholds) {
+                thresholdsStr.append(threshold).append(",");
+            }
+            prefs.edit().putString(LEVEL_THRESHOLDS_KEY, thresholdsStr.toString()).apply();
+            prefs.edit().putInt(CURRENT_LEVEL_KEY, 1).apply();
+            prefs.edit().putInt(TOTAL_STEPS_KEY, 0).apply();
+        }
+    }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -202,12 +218,12 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         textToSpeech = new TextToSpeech(requireContext(), this);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
 
-        // Initialize SensorManager for the step counter
         sensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
         if (sensorManager != null) {
             stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
         }
 
+        initializeLevelThresholds();
 
         mapView.setTileSource(TileSourceFactory.OpenTopo);
         mapView.setMultiTouchControls(true);
@@ -218,7 +234,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         addMapOverlays();
         setupTrailTypeSpinner(view);
         checkLocationServices();
-        requestLocationAndActivityPermissions(); // MODIFIED: Request both permissions
+        requestLocationAndActivityPermissions();
 
         return view;
     }
@@ -229,7 +245,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         distanceToNext = view.findViewById(R.id.distance_to_next);
         remainingDistance = view.findViewById(R.id.remaining_distance);
         estimatedTime = view.findViewById(R.id.estimated_time);
-        stepsCountView = view.findViewById(R.id.steps_count); // NEW: Initialize step counter TextView
+        stepsCountView = view.findViewById(R.id.steps_count);
         navigationProgress = view.findViewById(R.id.navigation_progress);
         stopNavigationButton = view.findViewById(R.id.stop_navigation_button);
         if (stopNavigationButton != null) {
@@ -252,11 +268,9 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         }
     }
 
-    // NEW: Method to request all needed permissions together
     private void requestLocationAndActivityPermissions() {
         List<String> permissionsToRequest = new ArrayList<>();
 
-        // Always request location permissions
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
         }
@@ -264,7 +278,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION);
         }
 
-        // Only request ACTIVITY_RECOGNITION for Android 10+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION);
@@ -280,6 +293,215 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             requestPermissionsLauncher.launch(permissionsToRequest.toArray(new String[0]));
         }
     }
+
+    // --- STEP COUNTER LOGIC ---
+
+    private void startStepCounter() {
+        if (stepCounterSensor == null) {
+            Toast.makeText(requireContext(), "Step counter sensor not available.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        initialSteps = -1; // Reset to capture the first sensor reading
+        stepsTakenDuringSession = 0; // Reset session counter
+        stepsCountView.setText("Steps: 0"); // Reset UI
+        sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
+    }
+
+    private void stopStepCounter() {
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+        // Save the final count from the session to preferences only when stopping
+        if (stepsTakenDuringSession > 0) {
+            SharedPreferences prefs = requireContext().getSharedPreferences(STEP_PREFS, Context.MODE_PRIVATE);
+            int previousTotalSteps = prefs.getInt(TOTAL_STEPS_KEY, 0);
+            int newTotalSteps = previousTotalSteps + stepsTakenDuringSession;
+
+            prefs.edit().putInt(TOTAL_STEPS_KEY, newTotalSteps).apply();
+            Log.d(TAG, "Saved " + stepsTakenDuringSession + " steps. New total: " + newTotalSteps);
+
+            // Check for level up with the new total
+            checkLevelUp(newTotalSteps);
+        }
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            if (initialSteps == -1) {
+                // First event after starting navigation, capture the baseline sensor value
+                initialSteps = (int) event.values[0];
+            }
+            // Calculate steps taken since this navigation session started
+            stepsTakenDuringSession = (int) event.values[0] - initialSteps;
+            if (stepsCountView != null) {
+                stepsCountView.setText(String.format(Locale.US, "Steps: %d", stepsTakenDuringSession));
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // Not needed for this implementation
+    }
+
+    private void checkLevelUp(int totalSteps) {
+        SharedPreferences prefs = requireContext().getSharedPreferences(STEP_PREFS, Context.MODE_PRIVATE);
+        int currentLevel = prefs.getInt(CURRENT_LEVEL_KEY, 1);
+
+        String thresholdsStr = prefs.getString(LEVEL_THRESHOLDS_KEY, "");
+        if (thresholdsStr.isEmpty()) return;
+
+        String[] thresholdsArray = thresholdsStr.split(",");
+        int[] thresholds = new int[thresholdsArray.length];
+        for (int i = 0; i < thresholdsArray.length; i++) {
+            try {
+                thresholds[i] = Integer.parseInt(thresholdsArray[i]);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "Error parsing level thresholds", e);
+                return;
+            }
+        }
+
+        // Check if user has reached the threshold for the next level
+        int nextLevelIndex = currentLevel; // Use currentLevel as index
+        if (nextLevelIndex < thresholds.length && totalSteps >= thresholds[nextLevelIndex]) {
+            int newLevel = currentLevel + 1;
+            prefs.edit().putInt(CURRENT_LEVEL_KEY, newLevel).apply();
+
+            requireActivity().runOnUiThread(() -> {
+                Toast.makeText(requireContext(), "Congratulations! You've reached Level " + newLevel, Toast.LENGTH_LONG).show();
+            });
+        }
+    }
+
+    // --- NAVIGATION LOGIC ---
+
+    private void stopNavigation() {
+        isNavigating = false;
+        currentNavigation = null;
+        if (navigationRoute != null) {
+            mapView.getOverlays().remove(navigationRoute);
+            navigationRoute = null;
+        }
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+            navigationLocationCallback = null;
+        }
+        if (navigationPanel != null) {
+            navigationPanel.setVisibility(View.GONE);
+        }
+
+        // Stop the step counter and save the final count
+        stopStepCounter();
+
+        mapView.invalidate();
+        Toast.makeText(requireContext(), "Navigation stopped", Toast.LENGTH_SHORT).show();
+    }
+
+    private void startNavigationWithRealData(TrailDetails details, List<GeoPoint> realRoutePoints, List<NavigationStep> realSteps, double totalDistanceMeters) {
+        try {
+            if (realRoutePoints.size() < 2) {
+                Toast.makeText(requireContext(), "Invalid route data received.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            isNavigating = true;
+            currentNavigation = new NavigationData(
+                    details.name,
+                    realRoutePoints,
+                    details.type,
+                    totalDistanceMeters
+            );
+
+            this.navigationSteps = realSteps;
+            this.currentStepIndex = 0;
+
+            if (navigationPanel != null) {
+                navigationPanel.setVisibility(View.VISIBLE);
+            }
+
+            // Start the step counter
+            startStepCounter();
+
+            drawNavigationRoute(realRoutePoints);
+            startNavigationLocationUpdates();
+            updateNavigationUI();
+
+            Toast.makeText(requireContext(), "Navigation started for " + details.name, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting navigation with real data", e);
+        }
+    }
+
+    private void updateNavigationUI() {
+        if (navigationSteps == null || currentStepIndex >= navigationSteps.size() || !isNavigating) {
+            return;
+        }
+
+        final NavigationStep currentStep = navigationSteps.get(currentStepIndex);
+
+        requireActivity().runOnUiThread(() -> {
+            navigationInstruction.setText(currentStep.instruction);
+
+            double distanceToNextStep = calculateDistance(lastKnownLocation, currentStep.point);
+            distanceToNext.setText(String.format(Locale.US, "%.0f m", distanceToNextStep));
+
+            double remainingDist = calculateRemainingDistance();
+            remainingDistance.setText(String.format(Locale.US, "%.1f km", remainingDist / 1000));
+
+            int minutes = (int) ((remainingDist / 1000) / 5 * 60);
+            estimatedTime.setText(String.format(Locale.US, "%d min", minutes));
+
+            double totalDistance = currentNavigation.totalDistanceMeters;
+            if (totalDistance > 0) {
+                double traveled = totalDistance - remainingDist;
+                int progress = (int) ((traveled / totalDistance) * 100);
+                navigationProgress.setProgress(Math.max(0, Math.min(100, progress)));
+            }
+        });
+    }
+
+    // --- LIFECYCLE METHODS ---
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+        }
+        if (navigationLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
+        }
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+        mapView.onDetach();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (isNavigating) {
+            // Unregister to save battery, but don't save steps yet
+            sensorManager.unregisterListener(this);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (isNavigating && stepCounterSensor != null) {
+            // Re-register when app is back in foreground
+            sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
+        }
+    }
+
+    // --- UNCHANGED HELPER METHODS (OMITTED FOR BREVITY) ---
+    // The rest of your methods (fetchRealRouteAndStartNavigation, showTrailDetailsDialog,
+    // setupTrailTypeSpinner, filterTrails, addMapOverlays, etc.) do not require
+    // changes for the step counting logic and can remain as they were in your original file.
+    // I am including them below for a complete, runnable file.
 
     private void fetchRealRouteAndStartNavigation(TrailDetails details) {
         if (lastKnownLocation == null || details.routePoints.isEmpty()) {
@@ -334,9 +556,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                     JsonObject summary = properties.getAsJsonArray("segments").get(0).getAsJsonObject();
                     JsonObject geometry = feature.getAsJsonObject("geometry");
 
-                    // FIXED: Get REAL distance from the API response (it's in meters)
                     double realTotalDistanceMeters = summary.get("distance").getAsDouble();
-
                     JsonArray stepsJson = summary.getAsJsonArray("steps");
                     JsonArray coordinates = geometry.getAsJsonArray("coordinates");
 
@@ -349,7 +569,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                     List<NavigationStep> navigationSteps = parseOrsSteps(stepsJson, routePoints);
 
                     requireActivity().runOnUiThread(() -> {
-                        // Pass the real distance to the navigation method
                         startNavigationWithRealData(details, routePoints, navigationSteps, realTotalDistanceMeters);
                     });
 
@@ -360,174 +579,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         });
     }
 
-    private void startNavigationWithRealData(TrailDetails details, List<GeoPoint> realRoutePoints, List<NavigationStep> realSteps, double totalDistanceMeters) {
-        try {
-            if (realRoutePoints.size() < 2) {
-                Toast.makeText(requireContext(), "Invalid route data received.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            isNavigating = true;
-            // FIXED: Use the real distance from the API
-            currentNavigation = new NavigationData(
-                    details.name,
-                    realRoutePoints,
-                    details.type,
-                    totalDistanceMeters
-            );
-
-            this.navigationSteps = realSteps;
-            this.currentStepIndex = 0;
-
-            if (navigationPanel != null) {
-                navigationPanel.setVisibility(View.VISIBLE);
-            }
-
-            // Start the step counter
-            startStepCounter();
-
-            drawNavigationRoute(realRoutePoints);
-            startNavigationLocationUpdates();
-            updateNavigationUI();
-
-            Toast.makeText(requireContext(), "Navigation started for " + details.name, Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "Error starting navigation with real data", e);
-        }
-    }
-
-
-    private void updateNavigationUI() {
-        if (navigationSteps == null || currentStepIndex >= navigationSteps.size() || !isNavigating) {
-            return;
-        }
-
-        final NavigationStep currentStep = navigationSteps.get(currentStepIndex);
-
-        requireActivity().runOnUiThread(() -> {
-            navigationInstruction.setText(currentStep.instruction);
-
-            double distanceToNextStep = calculateDistance(lastKnownLocation, currentStep.point);
-            distanceToNext.setText(String.format(Locale.US, "%.0f m", distanceToNextStep));
-
-            double remainingDist = calculateRemainingDistance();
-            remainingDistance.setText(String.format(Locale.US, "%.1f km", remainingDist / 1000));
-
-            // Estimate time based on a standard hiking speed (e.g., 5 km/h)
-            int minutes = (int) ((remainingDist / 1000) / 5 * 60);
-            estimatedTime.setText(String.format(Locale.US, "%d min", minutes));
-
-            // FIXED: Progress bar calculation based on real distance
-            double totalDistance = currentNavigation.totalDistanceMeters;
-            if (totalDistance > 0) {
-                double traveled = totalDistance - remainingDist;
-                int progress = (int) ((traveled / totalDistance) * 100);
-                navigationProgress.setProgress(Math.max(0, Math.min(100, progress)));
-            }
-        });
-    }
-
-
-    private void stopNavigation() {
-        isNavigating = false;
-        currentNavigation = null;
-        if (navigationRoute != null) {
-            mapView.getOverlays().remove(navigationRoute);
-            navigationRoute = null;
-        }
-        if (navigationLocationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
-            navigationLocationCallback = null;
-        }
-        if (navigationPanel != null) {
-            navigationPanel.setVisibility(View.GONE);
-        }
-
-        // Stop the step counter
-        stopStepCounter();
-
-        mapView.invalidate();
-        Toast.makeText(requireContext(), "Navigation stopped", Toast.LENGTH_SHORT).show();
-    }
-
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (textToSpeech != null) {
-            textToSpeech.stop();
-            textToSpeech.shutdown();
-        }
-        if (navigationLocationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(navigationLocationCallback);
-        }
-        // Make sure to unregister the sensor listener
-        if (sensorManager != null) {
-            sensorManager.unregisterListener(this);
-        }
-        mapView.onDetach();
-    }
-
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        // Unregister listener to save battery when the app is not in the foreground
-        if (isNavigating) {
-            sensorManager.unregisterListener(this);
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        // Re-register listener when the app comes back to the foreground
-        if (isNavigating && stepCounterSensor != null) {
-            sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
-        }
-    }
-
-
-    // --- SENSOR EVENT LISTENER METHODS FOR STEP COUNTER ---
-
-    private void startStepCounter() {
-        if (stepCounterSensor == null) {
-            Toast.makeText(requireContext(), "Step counter sensor not available.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        initialSteps = -1; // Reset on each new navigation
-        stepsCountView.setText("Steps: 0"); // Reset UI
-        sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
-    }
-
-    private void stopStepCounter() {
-        if (sensorManager != null) {
-            sensorManager.unregisterListener(this);
-        }
-    }
-
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
-            if (initialSteps == -1) {
-                // This is the first event we receive. Store the current step count as the baseline.
-                initialSteps = (int) event.values[0];
-            }
-            // Calculate steps taken since navigation started
-            int currentSteps = (int) event.values[0] - initialSteps;
-            if (stepsCountView != null) {
-                stepsCountView.setText(String.format(Locale.US, "Steps: %d", currentSteps));
-            }
-        }
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Not needed for this implementation
-    }
-
-    // --- UNCHANGED METHODS BELOW ---
-    // (I've collapsed them for brevity, but they are included in the final code block)
-
+    // ... all other unchanged methods from your original file go here ...
     private void setupTrailTypeSpinner(View view) {
         trailTypeSpinner = view.findViewById(R.id.trail_type_spinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(requireContext(), R.array.trail_types_array, android.R.layout.simple_spinner_item);
