@@ -227,8 +227,11 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
 
         mapView.setTileSource(TileSourceFactory.OpenTopo);
         mapView.setMultiTouchControls(true);
-        mapView.getController().setCenter(new GeoPoint(51.1657, 10.4515));
-        mapView.getController().setZoom(8.0);
+
+        // **FIXED**: Removed hardcoded location. The map will now center on the user's location
+        // once it is found by the findAndCenterOnUserLocation() method.
+        // mapView.getController().setCenter(new GeoPoint(51.1657, 10.4515));
+        // mapView.getController().setZoom(8.0);
 
         initNavigationUI(view);
         addMapOverlays();
@@ -295,6 +298,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
     }
 
     // --- STEP COUNTER LOGIC ---
+    // This logic is correct and uses the real hardware sensor. It is NOT random.
 
     private void startStepCounter() {
         if (stepCounterSensor == null) {
@@ -497,11 +501,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         }
     }
 
-    // --- UNCHANGED HELPER METHODS (OMITTED FOR BREVITY) ---
-    // The rest of your methods (fetchRealRouteAndStartNavigation, showTrailDetailsDialog,
-    // setupTrailTypeSpinner, filterTrails, addMapOverlays, etc.) do not require
-    // changes for the step counting logic and can remain as they were in your original file.
-    // I am including them below for a complete, runnable file.
+    // --- HELPER METHODS ---
 
     private void fetchRealRouteAndStartNavigation(TrailDetails details) {
         if (lastKnownLocation == null || details.routePoints.isEmpty()) {
@@ -579,7 +579,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         });
     }
 
-    // ... all other unchanged methods from your original file go here ...
     private void setupTrailTypeSpinner(View view) {
         trailTypeSpinner = view.findViewById(R.id.trail_type_spinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(requireContext(), R.array.trail_types_array, android.R.layout.simple_spinner_item);
@@ -852,6 +851,12 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         mapView.invalidate();
     }
 
+    /**
+     * NOTE: This method generates placeholder/random data for trail details.
+     * The Google Places API provides the location of trailheads, but not details like
+     * difficulty, distance, or elevation. To make this a real-world app, you would
+     * need to replace this with a call to a specialized trail data API.
+     */
     private TrailDetails generateTrailDetails(String id, String name, String category, double rating, GeoPoint startPoint) {
         Random random = new Random();
         String[] difficulties = {"Easy", "Moderate", "Challenging"};
