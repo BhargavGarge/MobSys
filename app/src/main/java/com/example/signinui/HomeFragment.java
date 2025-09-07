@@ -1,20 +1,35 @@
 package com.example.signinui;
 
 import android.Manifest;
+import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -101,6 +116,19 @@ public class HomeFragment extends Fragment {
     };
 
     private Random random = new Random();
+    private static final int REQUEST_BLUETOOTH_CONNECT = 1001;
+    // Bluetooth related variables
+    private BluetoothService bluetoothService;
+    private boolean isBound = false;
+    private List<BluetoothDevice> nearbyDevices = new ArrayList<>();
+    private ActivityResultLauncher<String[]> permissionLauncher;
+
+    // Bluetooth dialog variables
+    private AlertDialog discoveryDialog;
+    private RecyclerView devicesRecyclerView;
+    private BluetoothDeviceAdapter devicesAdapter;
+    private TextView searchingText;
+    private ProgressBar progressBar;
 
     @Nullable
     @Override
@@ -145,6 +173,237 @@ public class HomeFragment extends Fragment {
         }
 
         return view;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // Initialize permission launcher
+        permissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestMultiplePermissions(),
+                result -> {
+                    boolean allGranted = true;
+                    for (Boolean granted : result.values()) {
+                        if (!granted) {
+                            allGranted = false;
+                            break;
+                        }
+                    }
+
+                    if (allGranted) {
+                        startBluetoothDiscovery();
+                    } else {
+                        Toast.makeText(requireContext(), "Permissions denied", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
+
+        // Set up find friends button
+        View findFriendsButton = view.findViewById(R.id.find_friends_button);
+        if (findFriendsButton != null) {
+            findFriendsButton.setOnClickListener(v -> checkPermissionsAndStartDiscovery());
+        }
+
+        // Bind to Bluetooth service
+        Intent intent = new Intent(requireContext(), BluetoothService.class);
+        requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    // Service connection for Bluetooth service
+    private ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BluetoothService.LocalBinder binder = (BluetoothService.LocalBinder) service;
+            bluetoothService = binder.getService();
+            isBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isBound = false;
+        }
+    };
+
+    // Permission checking method
+    private void checkPermissionsAndStartDiscovery() {
+        String[] requiredPermissions = {
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.ACCESS_FINE_LOCATION
+        };
+
+        boolean allPermissionsGranted = true;
+        for (String permission : requiredPermissions) {
+            if (ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED) {
+                allPermissionsGranted = false;
+                break;
+            }
+        }
+
+        if (allPermissionsGranted) {
+            startBluetoothDiscovery();
+        } else {
+            permissionLauncher.launch(requiredPermissions);
+        }
+    }
+
+    // Bluetooth discovery method
+    private void startBluetoothDiscovery() {
+        if (!isBound || bluetoothService == null) {
+            Toast.makeText(requireContext(), "Bluetooth service not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!bluetoothService.isBluetoothEnabled()) {
+            bluetoothService.enableBluetooth();
+            Toast.makeText(requireContext(), "Please enable Bluetooth", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show discovery dialog
+        showDiscoveryDialog();
+
+        // Start discovery
+        bluetoothService.startDiscovery(new BluetoothService.BluetoothDiscoveryListener() {
+            @Override
+            public void onDeviceDiscovered(BluetoothDevice device) {
+                requireActivity().runOnUiThread(() -> {
+                    if (!nearbyDevices.contains(device)) {
+                        nearbyDevices.add(device);
+                        updateDiscoveryDialog();
+                    }
+                });
+            }
+
+            @Override
+            public void onDeviceConnected(BluetoothDevice device) {
+                requireActivity().runOnUiThread(() -> {
+                    if (ContextCompat.checkSelfPermission(requireContext(),
+                            Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                        Toast.makeText(requireContext(), "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(requireContext(), "Connected to device", Toast.LENGTH_SHORT).show();
+                        // Or request permission if needed
+                        ActivityCompat.requestPermissions(requireActivity(),
+                                new String[]{Manifest.permission.BLUETOOTH_CONNECT},
+                                REQUEST_BLUETOOTH_CONNECT);
+                    }
+                });
+            }
+
+            @Override
+            public void onFriendRequestReceived(String userId, String userName) {
+                requireActivity().runOnUiThread(() -> {
+                    showFriendRequestDialog(userId, userName);
+                });
+            }
+
+            @Override
+            public void onConnectionError(String message) {
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    // Bluetooth dialog methods
+    private void showDiscoveryDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext(), R.style.CustomAlertDialog);
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_bluetooth_discovery, null);
+        builder.setView(dialogView);
+
+        // Initialize views
+        searchingText = dialogView.findViewById(R.id.searching_text);
+        progressBar = dialogView.findViewById(R.id.progress_bar);
+        devicesRecyclerView = dialogView.findViewById(R.id.devices_recycler);
+        TextView title = dialogView.findViewById(R.id.dialog_title);
+        ImageView bluetoothIcon = dialogView.findViewById(R.id.bluetooth_icon);
+
+        // Set up recycler view
+        devicesAdapter = new BluetoothDeviceAdapter(nearbyDevices, device -> {
+            // Connect to selected device
+            if (isBound && bluetoothService != null) {
+                bluetoothService.connectToDevice(device);
+                discoveryDialog.dismiss();
+            }
+        });
+
+        devicesRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        devicesRecyclerView.setAdapter(devicesAdapter);
+
+        // Set dialog properties
+        discoveryDialog = builder.create();
+        discoveryDialog.setCanceledOnTouchOutside(false);
+        discoveryDialog.show();
+
+        // Customize dialog window
+        Window window = discoveryDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        // Set negative button
+        TextView cancelButton = dialogView.findViewById(R.id.cancel_button);
+        cancelButton.setOnClickListener(v -> {
+            if (isBound && bluetoothService != null) {
+                bluetoothService.stopDiscovery();
+            }
+            discoveryDialog.dismiss();
+        });
+    }
+
+    private void updateDiscoveryDialog() {
+        if (discoveryDialog != null && discoveryDialog.isShowing()) {
+            if (nearbyDevices.isEmpty()) {
+                searchingText.setText("Searching for nearby adventurers...");
+                devicesRecyclerView.setVisibility(View.GONE);
+                progressBar.setVisibility(View.VISIBLE);
+            } else {
+                searchingText.setText(nearbyDevices.size() + " adventurers nearby");
+                devicesRecyclerView.setVisibility(View.VISIBLE);
+                progressBar.setVisibility(View.GONE);
+                devicesAdapter.notifyDataSetChanged();
+            }
+        }
+    }
+
+    private void showFriendRequestDialog(String userId, String userName) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Friend Request");
+        builder.setMessage(userName + " wants to be your friend");
+        builder.setPositiveButton("Accept", (dialog, which) -> {
+            acceptFriendRequest(userId);
+        });
+        builder.setNegativeButton("Decline", (dialog, which) -> {
+            // Do nothing
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void acceptFriendRequest(String userId) {
+        // Add friend to Firebase
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser != null) {
+            mDatabase.child("friends").child(currentUser.getUid()).child(userId).setValue(true);
+            mDatabase.child("friends").child(userId).child(currentUser.getUid()).setValue(true);
+            Toast.makeText(requireContext(), "Friend added!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (isBound) {
+            requireContext().unbindService(serviceConnection);
+            isBound = false;
+        }
     }
 
     private void loadUserData() {
