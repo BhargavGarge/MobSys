@@ -13,7 +13,9 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -117,9 +119,11 @@ public class HomeFragment extends Fragment {
 
     private Random random = new Random();
     private static final int REQUEST_BLUETOOTH_CONNECT = 1001;
+
     // Bluetooth related variables
     private BluetoothService bluetoothService;
-    private boolean isBound = false;
+    private boolean isServiceBound = false;
+    private boolean isDiscoveryRequested = false;
     private List<BluetoothDevice> nearbyDevices = new ArrayList<>();
     private ActivityResultLauncher<String[]> permissionLauncher;
 
@@ -191,9 +195,9 @@ public class HomeFragment extends Fragment {
                         }
                     }
 
-                    if (allGranted) {
+                    if (allGranted && isServiceBound) {
                         startBluetoothDiscovery();
-                    } else {
+                    } else if (!allGranted) {
                         Toast.makeText(requireContext(), "Permissions denied", Toast.LENGTH_SHORT).show();
                     }
                 }
@@ -206,8 +210,17 @@ public class HomeFragment extends Fragment {
         }
 
         // Bind to Bluetooth service
-        Intent intent = new Intent(requireContext(), BluetoothService.class);
-        requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        bindBluetoothService();
+    }
+
+    private void bindBluetoothService() {
+        try {
+            Intent intent = new Intent(requireContext(), BluetoothService.class);
+            requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to bind Bluetooth service", e);
+            Toast.makeText(requireContext(), "Failed to initialize Bluetooth", Toast.LENGTH_SHORT).show();
+        }
     }
 
     // Service connection for Bluetooth service
@@ -216,17 +229,40 @@ public class HomeFragment extends Fragment {
         public void onServiceConnected(ComponentName name, IBinder service) {
             BluetoothService.LocalBinder binder = (BluetoothService.LocalBinder) service;
             bluetoothService = binder.getService();
-            isBound = true;
+            isServiceBound = true;
+
+            // If discovery was requested before service was bound, start it now
+            if (isDiscoveryRequested) {
+                checkPermissionsAndStartDiscovery();
+                isDiscoveryRequested = false;
+            }
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            isBound = false;
+            isServiceBound = false;
+            bluetoothService = null;
         }
     };
 
     // Permission checking method
     private void checkPermissionsAndStartDiscovery() {
+        if (!isServiceBound) {
+            // Service not bound yet, set flag to start discovery once bound
+            isDiscoveryRequested = true;
+            Toast.makeText(requireContext(), "Setting up Bluetooth service...", Toast.LENGTH_SHORT).show();
+
+            // Wait a bit for service to bind, then try again
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (isServiceBound) {
+                    checkPermissionsAndStartDiscovery();
+                } else {
+                    Toast.makeText(requireContext(), "Bluetooth service not available. Please try again.", Toast.LENGTH_SHORT).show();
+                }
+            }, 1000); // Wait 1 second
+            return;
+        }
+
         String[] requiredPermissions = {
                 Manifest.permission.BLUETOOTH,
                 Manifest.permission.BLUETOOTH_ADMIN,
@@ -250,10 +286,17 @@ public class HomeFragment extends Fragment {
         }
     }
 
+    private boolean isBluetoothServiceAvailable() {
+        if (!isServiceBound || bluetoothService == null) {
+            Toast.makeText(requireContext(), "Bluetooth service not ready yet. Please wait...", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        return true;
+    }
+
     // Bluetooth discovery method
     private void startBluetoothDiscovery() {
-        if (!isBound || bluetoothService == null) {
-            Toast.makeText(requireContext(), "Bluetooth service not available", Toast.LENGTH_SHORT).show();
+        if (!isBluetoothServiceAvailable()) {
             return;
         }
 
@@ -326,9 +369,11 @@ public class HomeFragment extends Fragment {
         // Set up recycler view
         devicesAdapter = new BluetoothDeviceAdapter(nearbyDevices, device -> {
             // Connect to selected device
-            if (isBound && bluetoothService != null) {
+            if (isServiceBound && bluetoothService != null) {
                 bluetoothService.connectToDevice(device);
-                discoveryDialog.dismiss();
+                if (discoveryDialog != null && discoveryDialog.isShowing()) {
+                    discoveryDialog.dismiss();
+                }
             }
         });
 
@@ -350,10 +395,12 @@ public class HomeFragment extends Fragment {
         // Set negative button
         TextView cancelButton = dialogView.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(v -> {
-            if (isBound && bluetoothService != null) {
+            if (isServiceBound && bluetoothService != null) {
                 bluetoothService.stopDiscovery();
             }
-            discoveryDialog.dismiss();
+            if (discoveryDialog != null && discoveryDialog.isShowing()) {
+                discoveryDialog.dismiss();
+            }
         });
     }
 
@@ -400,9 +447,13 @@ public class HomeFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (isBound) {
-            requireContext().unbindService(serviceConnection);
-            isBound = false;
+        if (isServiceBound) {
+            try {
+                requireContext().unbindService(serviceConnection);
+            } catch (Exception e) {
+                Log.e(TAG, "Error unbinding service", e);
+            }
+            isServiceBound = false;
         }
     }
 

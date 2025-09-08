@@ -138,6 +138,7 @@
             android:layout_marginLeft="48dp"
             android:layout_marginRight="48dp">
             <TextView
+                android:id="@+id/textViewNeedHelp"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:textColor="@color/black"
@@ -145,8 +146,9 @@
                 android:text="Need Help?"
                 android:fontFamily="@font/seg_ui_semibold"
                 android:layout_marginLeft="12dp"
-                android:layout_weight="1" />
-
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
             <Button
                 android:id="@+id/btnLogin"
                 android:layout_width="0dp"
