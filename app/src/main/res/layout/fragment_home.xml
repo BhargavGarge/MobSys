@@ -58,6 +58,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Adventure awaits"
+                            android:fontFamily="@font/segoe_ui_bold"
                             android:textColor="#FFFFFF"
                             android:textSize="16sp"
                             android:alpha="0.9" />
@@ -67,10 +68,11 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Bhargav"
+                            android:fontFamily="@font/segoe_ui_bold"
                             android:textColor="#FFFFFF"
                             android:textSize="24sp"
                             android:textStyle="bold"
-                            android:fontFamily="serif" />
+                         />
                     </LinearLayout>
 
                     <!-- Weather & Notifications -->
@@ -102,6 +104,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="8dp"
                                 android:text="22°C"
+                                android:fontFamily="@font/segoe_ui_bold"
                                 android:textColor="#475569"
                                 android:textSize="16sp"
                                 android:textStyle="bold" />
@@ -130,14 +133,16 @@
                             android:layout_height="wrap_content"
                             android:text="847"
                             android:textColor="#FFFFFF"
+                            android:fontFamily="@font/segoe_ui_bold"
                             android:textSize="28sp"
                             android:textStyle="bold"
-                            android:fontFamily="serif" />
+                             />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="km explored"
+                            android:fontFamily="@font/segoe_ui_bold"
                             android:textColor="#FFFFFF"
                             android:textSize="14sp"
                             android:alpha="0.9" />
@@ -158,13 +163,14 @@
                             android:textColor="#FFFFFF"
                             android:textSize="28sp"
                             android:textStyle="bold"
-                            android:fontFamily="serif" />
+                            android:fontFamily="@font/segoe_ui_bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="m climbed"
                             android:textColor="#FFFFFF"
+                            android:fontFamily="@font/segoe_ui_bold"
                             android:textSize="14sp"
                             android:alpha="0.9" />
                     </LinearLayout>
@@ -184,12 +190,13 @@
                             android:textColor="#FFFFFF"
                             android:textSize="28sp"
                             android:textStyle="bold"
-                            android:fontFamily="serif" />
+                            android:fontFamily="@font/segoe_ui_bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="adventures"
+                            android:fontFamily="@font/segoe_ui_bold"
                             android:textColor="#FFFFFF"
                             android:textSize="14sp"
                             android:alpha="0.9" />
@@ -213,7 +220,7 @@
                 android:textColor="#475569"
                 android:textSize="24sp"
                 android:textStyle="bold"
-                android:fontFamily="serif" />
+                android:fontFamily="@font/segoe_ui_bold" />
 
             <!-- Adventure Actions Grid -->
             <LinearLayout
@@ -271,10 +278,12 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="12dp"
                                 android:text="Plan Route"
-                                android:textColor="#FFFFFF"
+                                android:fontFamily="@font/segoe_ui_bold"  android:textColor="#FFFFFF"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
                                 android:textAlignment="center" />
+
+
 
                         </LinearLayout>
 
@@ -332,6 +341,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="12dp"
                                 android:text="Discover"
+                                android:fontFamily="@font/segoe_ui_bold"
                                 android:textColor="#FFFFFF"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
@@ -403,14 +413,15 @@
                                 android:textColor="#FFFFFF"
                                 android:textSize="20sp"
                                 android:textStyle="bold"
-                                android:fontFamily="serif" />
+                                android:fontFamily="@font/segoe_ui_bold" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="Track your adventure in real-time"
+                                android:text="Track your adventure "
                                 android:textColor="#FFFFFF"
+                                android:fontFamily="@font/segoe_ui_bold"
                                 android:textSize="14sp"
                                 android:alpha="0.9" />
 
@@ -454,7 +465,7 @@
                     android:textColor="#475569"
                     android:textSize="24sp"
                     android:textStyle="bold"
-                    android:fontFamily="serif" />
+                    android:fontFamily="@font/segoe_ui_bold" />
 
                 <TextView
                     android:id="@+id/view_all_routes"
@@ -463,6 +474,7 @@
                     android:background="?android:attr/selectableItemBackground"
                     android:padding="8dp"
                     android:text="View All"
+                    android:fontFamily="@font/segoe_ui_bold"
                     android:textColor="#059669"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -522,6 +534,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Find Nearby Friends"
+                        android:fontFamily="@font/segoe_ui_bold"
                         android:textColor="#1E293B"
                         android:textSize="18sp"
                         android:textStyle="bold" />
@@ -614,6 +627,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="Sarah completed"
                                     android:textColor="#475569"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textSize="16sp"
                                     android:textStyle="bold" />
 
@@ -621,6 +635,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="2 hours ago"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#94A3B8"
                                     android:textSize="14sp" />
 
@@ -638,6 +653,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="HIKING"
                                     android:textColor="#FFFFFF"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textSize="12sp"
                                     android:textStyle="bold"
                                     android:paddingStart="10dp"
@@ -655,10 +671,11 @@
                             android:layout_height="wrap_content"
                             android:layout_marginBottom="12dp"
                             android:text="Mountain Peak Trail"
+                            android:fontFamily="@font/segoe_ui_regular"
                             android:textColor="#475569"
                             android:textSize="18sp"
                             android:textStyle="bold"
-                            android:fontFamily="serif" />
+                             />
 
                         <!-- Activity Stats -->
                         <LinearLayout
@@ -684,6 +701,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="8dp"
                                     android:text="15.2 km"
+                                    android:fontFamily="@font/segoe_ui_bold"
                                     android:textColor="#475569"
                                     android:textSize="14sp"
                                     android:textStyle="bold" />
@@ -708,6 +726,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="8dp"
                                     android:text="4h 23m"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#475569"
                                     android:textSize="14sp"
                                     android:textStyle="bold" />
@@ -792,6 +811,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="Mike completed"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#475569"
                                     android:textSize="16sp"
                                     android:textStyle="bold" />
@@ -800,6 +820,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="5 hours ago"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#94A3B8"
                                     android:textSize="14sp" />
 
@@ -816,6 +837,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="CYCLING"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#FFFFFF"
                                     android:textSize="12sp"
                                     android:textStyle="bold"
@@ -834,10 +856,11 @@
                             android:layout_height="wrap_content"
                             android:layout_marginBottom="12dp"
                             android:text="Riverside Circuit"
+                            android:fontFamily="@font/seg_ui_semibold"
                             android:textColor="#475569"
                             android:textSize="18sp"
                             android:textStyle="bold"
-                            android:fontFamily="serif" />
+                             />
 
                         <!-- Activity Stats -->
                         <LinearLayout
@@ -863,6 +886,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="8dp"
                                     android:text="32.8 km"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#475569"
                                     android:textSize="14sp"
                                     android:textStyle="bold" />
@@ -887,6 +911,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="8dp"
                                     android:text="1h 45m"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#475569"
                                     android:textSize="14sp"
                                     android:textStyle="bold" />
@@ -911,6 +936,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="8dp"
                                     android:text="420m"
+                                    android:fontFamily="@font/seg_ui_semibold"
                                     android:textColor="#475569"
                                     android:textSize="14sp"
                                     android:textStyle="bold" />
