@@ -66,6 +66,7 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 public class HomeFragment extends Fragment {
+    private TextView kmExploredText, mClimbedText, adventuresText;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     private FusedLocationProviderClient fusedLocationClient;
     private ImageView weatherIcon;
@@ -156,7 +157,10 @@ public class HomeFragment extends Fragment {
         // Make sure to pass context to the adapter
         routeAdapter = new FeaturedRouteAdapter(routeList, requireContext());
         recyclerView.setAdapter(routeAdapter);
-
+        // Find the stat views from the hero section
+        kmExploredText = view.findViewById(R.id.stat_distance); // The TextView showing "847"
+        mClimbedText = view.findViewById(R.id.stat_elevation); // The TextView showing "12.4k"
+        adventuresText = view.findViewById(R.id.stat_adventures); // The TextView showing "23"
         // Load user data
         loadUserData();
 
