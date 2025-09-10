@@ -3,13 +3,16 @@ package com.example.signinui;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,14 +23,17 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -37,7 +43,7 @@ import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -49,10 +55,13 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -61,8 +70,10 @@ public class FeedFragment extends Fragment {
     private RecyclerView recyclerView;
     private FeedAdapter adapter;
     private List<FeedPost> postList;
+    private ProgressBar progressBar;
+    private LinearLayout emptyStateView;
 
-    private FloatingActionButton fabNewPost;
+    private ExtendedFloatingActionButton fabNewPost;
     private ImageButton btnAddPhoto;
 
     // Firebase
@@ -77,6 +88,7 @@ public class FeedFragment extends Fragment {
     private String currentLocationName = "Unknown Location";
 
     private Uri imageUri;
+    private String currentPhotoPath;
 
     // Activity Result Launchers
     private final ActivityResultLauncher<Intent> galleryLauncher = registerForActivityResult(
@@ -91,14 +103,13 @@ public class FeedFragment extends Fragment {
     private final ActivityResultLauncher<Intent> cameraLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                    imageUri = result.getData().getData();
-                    if (imageUri == null) {
-                        Bundle extras = result.getData().getExtras();
-                        if (extras != null && extras.containsKey("data")) {
-                            Toast.makeText(getContext(), "Please use gallery for better quality", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    // For Android Q and above, we use the saved imageUri
+                    // For older versions, we need to handle the bitmap data
+                    if (imageUri == null && result.getData() != null && result.getData().getExtras() != null) {
+                        // This is the case where we get bitmap data instead of URI
+                        Toast.makeText(getContext(), "Please use gallery for better quality", Toast.LENGTH_SHORT).show();
+                        return;
                     }
                     getCurrentLocation();
                 }
@@ -120,6 +131,18 @@ public class FeedFragment extends Fragment {
                         }
                     });
 
+    // Camera permission launcher
+    private final ActivityResultLauncher<String> cameraPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(),
+                    isGranted -> {
+                        if (isGranted) {
+                            // Permission granted, launch camera with proper URI handling
+                            dispatchTakePictureIntent();
+                        } else {
+                            Toast.makeText(getContext(), "Camera permission denied", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -137,6 +160,8 @@ public class FeedFragment extends Fragment {
         recyclerView = view.findViewById(R.id.recycler_feed);
         fabNewPost = view.findViewById(R.id.fab_new_post);
         btnAddPhoto = view.findViewById(R.id.btn_add_photo);
+        progressBar = view.findViewById(R.id.progress_bar);
+        emptyStateView = view.findViewById(R.id.empty_state_view);
 
         // Setup RecyclerView
         postList = new ArrayList<>();
@@ -146,6 +171,9 @@ public class FeedFragment extends Fragment {
         layoutManager.setStackFromEnd(true);
         recyclerView.setLayoutManager(layoutManager);
         recyclerView.setAdapter(adapter);
+
+        // Show loading initially
+        showLoading(true);
 
         // Fetch posts from Firebase
         fetchPosts();
@@ -157,6 +185,85 @@ public class FeedFragment extends Fragment {
         btnAddPhoto.setOnClickListener(addPostClickListener);
 
         return view;
+    }
+
+    private void showLoading(boolean isLoading) {
+        if (progressBar != null) {
+            progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        }
+        if (recyclerView != null) {
+            recyclerView.setVisibility(isLoading ? View.GONE : View.VISIBLE);
+        }
+        if (emptyStateView != null) {
+            emptyStateView.setVisibility(View.GONE);
+        }
+    }
+
+    private void showEmptyState() {
+        if (progressBar != null) {
+            progressBar.setVisibility(View.GONE);
+        }
+        if (recyclerView != null) {
+            recyclerView.setVisibility(View.GONE);
+        }
+        if (emptyStateView != null) {
+            emptyStateView.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showContent() {
+        if (progressBar != null) {
+            progressBar.setVisibility(View.GONE);
+        }
+        if (recyclerView != null) {
+            recyclerView.setVisibility(View.VISIBLE);
+        }
+        if (emptyStateView != null) {
+            emptyStateView.setVisibility(View.GONE);
+        }
+    }
+
+    private void dispatchTakePictureIntent() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+
+        // Ensure that there's a camera activity to handle the intent
+        if (takePictureIntent.resolveActivity(requireContext().getPackageManager()) != null) {
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+                Toast.makeText(getContext(), "Error creating image file", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                imageUri = FileProvider.getUriForFile(requireContext(),
+                        requireContext().getPackageName() + ".provider",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                takePictureIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                cameraLauncher.launch(takePictureIntent);
+            }
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        // Save a file: path for use with ACTION_VIEW intents
+        currentPhotoPath = image.getAbsolutePath();
+        return image;
     }
 
     private void getCurrentLocation() {
@@ -188,17 +295,21 @@ public class FeedFragment extends Fragment {
                 });
     }
 
-
-
-
     private void selectImage() {
         final CharSequence[] options = {"Take Photo", "Choose from Gallery", "Cancel"};
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Add Photo!");
         builder.setItems(options, (dialog, item) -> {
             if (options[item].equals("Take Photo")) {
-                Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                cameraLauncher.launch(takePictureIntent);
+                // Check camera permission before launching camera
+                if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    // Request camera permission
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                } else {
+                    // Permission already granted, launch camera with proper URI handling
+                    dispatchTakePictureIntent();
+                }
             } else if (options[item].equals("Choose from Gallery")) {
                 Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
                 galleryLauncher.launch(intent);
@@ -327,12 +438,20 @@ public class FeedFragment extends Fragment {
                         postList.add(post);
                     }
                 }
-                Collections.sort(postList, (p1, p2) -> Long.compare(p2.getTimestamp(), p1.getTimestamp()));
+
+                if (postList.isEmpty()) {
+                    showEmptyState();
+                } else {
+                    Collections.sort(postList, (p1, p2) -> Long.compare(p2.getTimestamp(), p1.getTimestamp()));
+                    showContent();
+                }
+
                 adapter.notifyDataSetChanged();
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
+                showEmptyState();
                 Toast.makeText(getContext(), databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
