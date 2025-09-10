@@ -1,3 +1,4 @@
+
 package com.example.signinui;
 
 import android.bluetooth.BluetoothDevice;
@@ -6,13 +7,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
 import java.util.List;
 
 public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDeviceAdapter.DeviceViewHolder> {
+
     private List<BluetoothDevice> devices;
     private OnDeviceClickListener listener;
 
@@ -28,7 +28,8 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
     @NonNull
     @Override
     public DeviceViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_bluetooth_device, parent, false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_bluetooth_device, parent, false);
         return new DeviceViewHolder(view);
     }
 
@@ -43,42 +44,39 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
         return devices.size();
     }
 
-    public static class DeviceViewHolder extends RecyclerView.ViewHolder {
+    public void updateDevices(List<BluetoothDevice> newDevices) {
+        devices.clear();
+        devices.addAll(newDevices);
+        notifyDataSetChanged();
+    }
+
+    static class DeviceViewHolder extends RecyclerView.ViewHolder {
         private TextView deviceName;
         private TextView deviceStatus;
         private ImageView deviceIcon;
-        private View deviceCard;
 
         public DeviceViewHolder(@NonNull View itemView) {
             super(itemView);
             deviceName = itemView.findViewById(R.id.device_name);
             deviceStatus = itemView.findViewById(R.id.device_status);
             deviceIcon = itemView.findViewById(R.id.device_icon);
-            deviceCard = itemView.findViewById(R.id.device_card);
         }
 
         public void bind(BluetoothDevice device, OnDeviceClickListener listener) {
-            String name;
-            try {
-                name = device.getName();
-                if (name == null || name.isEmpty()) {
-                    name = "Unknown Adventurer";
-                }
-            } catch (SecurityException e) {
-                name = "Unknown Adventurer";
+            String name = device.getName();
+            if (name == null || name.isEmpty()) {
+                name = "Unknown Device";
             }
-
             deviceName.setText(name);
-            deviceStatus.setText("Nearby • Tap to connect");
 
-            // Set different icons based on device type if available
-            if (name.toLowerCase().contains("phone") || name.toLowerCase().contains("mobile")) {
-                deviceIcon.setImageResource(R.drawable.ic_phone);
-            } else {
-                deviceIcon.setImageResource(R.drawable.ic_person);
-            }
+            String status = "Nearby • Tap to connect";
+            deviceStatus.setText(status);
 
-            deviceCard.setOnClickListener(v -> listener.onDeviceClick(device));
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onDeviceClick(device);
+                }
+            });
         }
     }
 }

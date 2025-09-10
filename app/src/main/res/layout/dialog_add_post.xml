@@ -17,7 +17,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/gradient_header"
+            android:background="@color/green"
             android:orientation="horizontal"
             android:padding="16dp"
             android:gravity="center_vertical">
@@ -83,14 +83,7 @@
                             android:src="@drawable/ic_camera"
                             app:tint="@android:color/white" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:text="Add Photo"
-                            android:textColor="@android:color/white"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
+
 
                     </LinearLayout>
 

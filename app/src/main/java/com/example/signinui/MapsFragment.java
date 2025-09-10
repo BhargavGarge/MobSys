@@ -3,7 +3,6 @@ package com.example.signinui;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -16,12 +15,10 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.preference.PreferenceManager;
-import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.Gravity;
@@ -44,7 +41,6 @@ import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.ViewModelProvider;
 
 import com.example.signinui.model.TrailDetails; // IMPORT THE SHARED MODEL
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -59,7 +55,6 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -93,11 +88,7 @@ import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+
 public class MapsFragment extends Fragment implements TextToSpeech.OnInitListener, SensorEventListener {
     private static final String STEP_PREFS = "StepPreferences";
     private static final String TOTAL_STEPS_KEY = "total_steps";
@@ -114,8 +105,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
     private final Gson gson = new Gson();
-    private NavigationViewModel navigationViewModel;
-    private Polyline navigationRoute;
 
     // Filter variables
     private String currentFilter = "all";
@@ -147,7 +136,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
 
     // Current location tracking for navigation
     private GeoPoint lastKnownLocation;
-
+    private Polyline navigationRoute;
     private List<NavigationStep> navigationSteps;
     private int currentStepIndex = 0;
 
@@ -225,11 +214,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
 
         View view = inflater.inflate(R.layout.fragment_maps, container, false);
         mapView = view.findViewById(R.id.map);
-        // UPDATED: The built-in navigation panel from your XML is now permanently hidden.
-        // The overlay managed by the service will be the primary navigation UI.
-        view.findViewById(R.id.navigation_panel).setVisibility(View.GONE);
-        // NEW: Initialize the shared ViewModel. `requireActivity()` ensures it's shared with MainActivity.
-        navigationViewModel = new ViewModelProvider(requireActivity()).get(NavigationViewModel.class);
 
         textToSpeech = new TextToSpeech(requireContext(), this);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
@@ -254,15 +238,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
         setupTrailTypeSpinner(view);
         checkLocationServices();
         requestLocationAndActivityPermissions();
-        // NEW: Observe the navigation state. If the service is stopped (e.g., from the notification),
-        // we remove the route line from the map to keep the UI in sync.
-        navigationViewModel.getIsNavigating().observe(getViewLifecycleOwner(), isNavigating -> {
-            if (!isNavigating && navigationRoute != null) {
-                mapView.getOverlays().remove(navigationRoute);
-                mapView.invalidate();
-                navigationRoute = null;
-            }
-        });
 
         return view;
     }
@@ -346,43 +321,12 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
             int previousTotalSteps = prefs.getInt(TOTAL_STEPS_KEY, 0);
             int newTotalSteps = previousTotalSteps + stepsTakenDuringSession;
 
-            // 1. Save to Local Preferences (existing code)
             prefs.edit().putInt(TOTAL_STEPS_KEY, newTotalSteps).apply();
             Log.d(TAG, "Saved " + stepsTakenDuringSession + " steps. New total: " + newTotalSteps);
-
-            // 2. NEW: Also save to Firebase
-            saveStepsToFirebase(stepsTakenDuringSession, newTotalSteps);
 
             // Check for level up with the new total
             checkLevelUp(newTotalSteps);
         }
-    }
-    // NEW METHOD: Save step data to Firebase Realtime Database
-    private void saveStepsToFirebase(int stepsThisSession, int newTotalSteps) {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) return;
-
-        DatabaseReference dbRef = FirebaseDatabase.getInstance().getReference();
-        String userId = currentUser.getUid();
-        String todayDateKey = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-
-        // Create a map of data to update
-        Map<String, Object> stepUpdates = new HashMap<>();
-
-        // Update the user's total lifetime steps
-        stepUpdates.put("users/" + userId + "/totalSteps", newTotalSteps);
-
-        // Update the daily steps for today.
-        // This uses Firebase's `serverIncrement()` to safely add to the existing daily total, even from multiple devices/sessions.
-        stepUpdates.put("user_steps/" + userId + "/" + todayDateKey, ServerValue.increment(stepsThisSession));
-
-        // Update the last updated timestamp
-        stepUpdates.put("users/" + userId + "/lastStepUpdate", ServerValue.TIMESTAMP);
-
-        // Perform the atomic update
-        dbRef.updateChildren(stepUpdates)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Steps successfully saved to Firebase"))
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to save steps to Firebase", e));
     }
 
     @Override
@@ -561,7 +505,7 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
 
     private void fetchRealRouteAndStartNavigation(TrailDetails details) {
         if (lastKnownLocation == null || details.routePoints.isEmpty()) {
-            Toast.makeText(requireContext(), "Cannot get current location for navigation.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Cannot determine start or end point for navigation.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -625,13 +569,6 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
                     List<NavigationStep> navigationSteps = parseOrsSteps(stepsJson, routePoints);
 
                     requireActivity().runOnUiThread(() -> {
-                        drawNavigationRoute(routePoints);
-                        Intent serviceIntent = new Intent(requireContext(), NavigationService.class);
-                        serviceIntent.putExtra("NAVIGATION_STEPS_JSON", gson.toJson(navigationSteps));
-                        ContextCompat.startForegroundService(requireContext(), serviceIntent);
-                        navigationViewModel.setNavigating(true);
-                        Toast.makeText(requireContext(), "Navigation started!", Toast.LENGTH_SHORT).show();
-
                         startNavigationWithRealData(details, routePoints, navigationSteps, realTotalDistanceMeters);
                     });
 
@@ -1059,19 +996,10 @@ public class MapsFragment extends Fragment implements TextToSpeech.OnInitListene
 
     private void startNavigation(TrailDetails details) {
         if (!hasLocationPermissions()) {
-            Toast.makeText(requireContext(), "Location permission required.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Location permission required for navigation", Toast.LENGTH_SHORT).show();
+            requestLocationAndActivityPermissions();
             return;
         }
-
-        // NEW: Before starting, we must check if the app has permission to draw overlays.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(requireContext())) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + requireActivity().getPackageName()));
-            startActivity(intent);
-            Toast.makeText(getContext(), "Please grant overlay permission for navigation.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        // The actual logic is now in fetchRealRouteAndStartNavigation
         fetchRealRouteAndStartNavigation(details);
     }
 

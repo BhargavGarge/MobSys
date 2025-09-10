@@ -19,6 +19,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,6 +36,7 @@ import com.example.signinui.model.FeedPost;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.firebase.auth.FirebaseAuth;
@@ -218,10 +220,12 @@ public class FeedFragment extends Fragment {
         final EditText editLocation = dialogView.findViewById(R.id.edit_location);
         final MaterialAutoCompleteTextView autoCompleteActivity = dialogView.findViewById(R.id.auto_complete_activity);
         final EditText editCaption = dialogView.findViewById(R.id.edit_post_caption);
+        final ImageButton btnClose = dialogView.findViewById(R.id.btn_close);
+        final LinearLayout btnChangePhoto = dialogView.findViewById(R.id.btn_change_photo);
+        final MaterialButton btnCancel = dialogView.findViewById(R.id.btn_cancel);
+        final MaterialButton btnPost = dialogView.findViewById(R.id.btn_post);
 
         imagePreview.setImageURI(imageUri);
-
-        // Set current location as default value but allow editing
         editLocation.setText(currentLocationName);
 
         // Setup activity type dropdown
@@ -232,24 +236,35 @@ public class FeedFragment extends Fragment {
                 activityTypes
         );
         autoCompleteActivity.setAdapter(activityAdapter);
-        autoCompleteActivity.setText("Hiking", false); // Set default value
+        autoCompleteActivity.setText("Hiking", false);
 
-        builder.setView(dialogView)
-//                .setTitle("Create Post")
-                .setPositiveButton("Post", (dialog, id) -> {
-                    String location = editLocation.getText().toString().trim();
-                    String activityType = autoCompleteActivity.getText().toString().trim();
-                    String caption = editCaption.getText().toString().trim();
+        // Create the dialog
+        AlertDialog dialog = builder.setView(dialogView).create();
 
-                    if (!location.isEmpty() && !activityType.isEmpty() && !caption.isEmpty()) {
-                        uploadPost(location, activityType, caption);
-                    } else {
-                        Toast.makeText(getContext(), "Please fill all fields", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", (dialog, id) -> dialog.cancel());
+        // Set up click listeners for custom buttons
+        btnClose.setOnClickListener(v -> dialog.dismiss());
 
-        builder.create().show();
+        btnChangePhoto.setOnClickListener(v -> {
+            dialog.dismiss();
+            selectImage();
+        });
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnPost.setOnClickListener(v -> {
+            String location = editLocation.getText().toString().trim();
+            String activityType = autoCompleteActivity.getText().toString().trim();
+            String caption = editCaption.getText().toString().trim();
+
+            if (!location.isEmpty() && !activityType.isEmpty() && !caption.isEmpty()) {
+                uploadPost(location, activityType, caption);
+                dialog.dismiss();
+            } else {
+                Toast.makeText(getContext(), "Please fill all fields", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        dialog.show();
     }
 
     private String getFileExtension(Uri uri) {

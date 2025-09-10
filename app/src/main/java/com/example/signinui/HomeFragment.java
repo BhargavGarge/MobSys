@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -66,7 +67,6 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 public class HomeFragment extends Fragment {
-    private TextView kmExploredText, mClimbedText, adventuresText;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     private FusedLocationProviderClient fusedLocationClient;
     private ImageView weatherIcon;
@@ -77,6 +77,7 @@ public class HomeFragment extends Fragment {
 
     // RecyclerView components for routes
     private RecyclerView recyclerView;
+    private RecyclerView devicesRecyclerView;
     private FeaturedRouteAdapter routeAdapter;
     private List<Route> routeList = new ArrayList<>();
 
@@ -119,21 +120,59 @@ public class HomeFragment extends Fragment {
     };
 
     private Random random = new Random();
-    private static final int REQUEST_BLUETOOTH_CONNECT = 1001;
 
     // Bluetooth related variables
     private BluetoothService bluetoothService;
     private boolean isServiceBound = false;
-    private boolean isDiscoveryRequested = false;
     private List<BluetoothDevice> nearbyDevices = new ArrayList<>();
     private ActivityResultLauncher<String[]> permissionLauncher;
+    private ActivityResultLauncher<Intent> enableBluetoothLauncher;
+    private boolean startDiscoveryAfterBind = false;
 
     // Bluetooth dialog variables
     private AlertDialog discoveryDialog;
-    private RecyclerView devicesRecyclerView;
     private BluetoothDeviceAdapter devicesAdapter;
     private TextView searchingText;
     private ProgressBar progressBar;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Initialize permission launcher
+        permissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestMultiplePermissions(),
+                permissions -> {
+                    boolean allGranted = true;
+                    for (Boolean granted : permissions.values()) {
+                        if (!granted) {
+                            allGranted = false;
+                            break;
+                        }
+                    }
+
+                    if (allGranted) {
+                        // Permissions granted, now proceed with discovery logic
+                        startBluetoothDiscovery();
+                    } else {
+                        Toast.makeText(requireContext(), "Bluetooth & Location permissions are required to find friends.", Toast.LENGTH_LONG).show();
+                    }
+                }
+        );
+
+        // Initialize Bluetooth enable launcher
+        enableBluetoothLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == getActivity().RESULT_OK) {
+                        // Bluetooth was enabled by the user, now start discovery
+                        startDiscoveryWithService();
+                    } else {
+                        Toast.makeText(requireContext(), "Bluetooth is required to discover nearby friends.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
+    }
 
     @Nullable
     @Override
@@ -157,10 +196,7 @@ public class HomeFragment extends Fragment {
         // Make sure to pass context to the adapter
         routeAdapter = new FeaturedRouteAdapter(routeList, requireContext());
         recyclerView.setAdapter(routeAdapter);
-        // Find the stat views from the hero section
-        kmExploredText = view.findViewById(R.id.stat_distance); // The TextView showing "847"
-        mClimbedText = view.findViewById(R.id.stat_elevation); // The TextView showing "12.4k"
-        adventuresText = view.findViewById(R.id.stat_adventures); // The TextView showing "23"
+
         // Load user data
         loadUserData();
 
@@ -180,65 +216,41 @@ public class HomeFragment extends Fragment {
             getLocationAndWeather();
         }
 
+        // Set up find friends button
+        view.findViewById(R.id.find_friends_button).setOnClickListener(v -> checkPermissionsAndStartDiscovery());
+
+        // Bind to Bluetooth service
+        bindBluetoothService();
+
         return view;
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        // Initialize permission launcher
-        permissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestMultiplePermissions(),
-                result -> {
-                    boolean allGranted = true;
-                    for (Boolean granted : result.values()) {
-                        if (!granted) {
-                            allGranted = false;
-                            break;
-                        }
-                    }
-
-                    if (allGranted && isServiceBound) {
-                        startBluetoothDiscovery();
-                    } else if (!allGranted) {
-                        Toast.makeText(requireContext(), "Permissions denied", Toast.LENGTH_SHORT).show();
-                    }
-                }
-        );
-
-        // Set up find friends button
-        View findFriendsButton = view.findViewById(R.id.find_friends_button);
-        if (findFriendsButton != null) {
-            findFriendsButton.setOnClickListener(v -> checkPermissionsAndStartDiscovery());
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (isServiceBound) {
+            requireContext().unbindService(serviceConnection);
+            isServiceBound = false;
         }
-
-        // Bind to Bluetooth service
-        bindBluetoothService();
     }
 
     private void bindBluetoothService() {
-        try {
-            Intent intent = new Intent(requireContext(), BluetoothService.class);
-            requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to bind Bluetooth service", e);
-            Toast.makeText(requireContext(), "Failed to initialize Bluetooth", Toast.LENGTH_SHORT).show();
-        }
+        Intent intent = new Intent(requireContext(), BluetoothService.class);
+        requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
-    // Service connection for Bluetooth service
-    private ServiceConnection serviceConnection = new ServiceConnection() {
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             BluetoothService.LocalBinder binder = (BluetoothService.LocalBinder) service;
             bluetoothService = binder.getService();
             isServiceBound = true;
+            Log.d(TAG, "BluetoothService connected.");
 
-            // If discovery was requested before service was bound, start it now
-            if (isDiscoveryRequested) {
-                checkPermissionsAndStartDiscovery();
-                isDiscoveryRequested = false;
+            // If discovery was requested before the service was bound, start it now.
+            if (startDiscoveryAfterBind) {
+                startDiscoveryAfterBind = false;
+                startBluetoothDiscovery();
             }
         }
 
@@ -246,133 +258,142 @@ public class HomeFragment extends Fragment {
         public void onServiceDisconnected(ComponentName name) {
             isServiceBound = false;
             bluetoothService = null;
+            Log.d(TAG, "BluetoothService disconnected.");
         }
     };
 
-    // Permission checking method
     private void checkPermissionsAndStartDiscovery() {
-        if (!isServiceBound) {
-            // Service not bound yet, set flag to start discovery once bound
-            isDiscoveryRequested = true;
-            Toast.makeText(requireContext(), "Setting up Bluetooth service...", Toast.LENGTH_SHORT).show();
-
-            // Wait a bit for service to bind, then try again
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                if (isServiceBound) {
-                    checkPermissionsAndStartDiscovery();
-                } else {
-                    Toast.makeText(requireContext(), "Bluetooth service not available. Please try again.", Toast.LENGTH_SHORT).show();
-                }
-            }, 1000); // Wait 1 second
-            return;
+        List<String> requiredPermissions = new ArrayList<>();
+        // For Android 12 (API 31) and above, new Bluetooth permissions are needed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requiredPermissions.add(Manifest.permission.BLUETOOTH_SCAN);
+            requiredPermissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+        } else {
+            // For older versions
+            requiredPermissions.add(Manifest.permission.BLUETOOTH);
+            requiredPermissions.add(Manifest.permission.BLUETOOTH_ADMIN);
         }
+        // Location is required for Bluetooth scanning regardless of Android version
+        requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
 
-        String[] requiredPermissions = {
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        };
-
-        boolean allPermissionsGranted = true;
+        List<String> permissionsToRequest = new ArrayList<>();
         for (String permission : requiredPermissions) {
             if (ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED) {
-                allPermissionsGranted = false;
-                break;
+                permissionsToRequest.add(permission);
             }
         }
 
-        if (allPermissionsGranted) {
+        if (permissionsToRequest.isEmpty()) {
             startBluetoothDiscovery();
         } else {
-            permissionLauncher.launch(requiredPermissions);
+            permissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
         }
     }
 
-    private boolean isBluetoothServiceAvailable() {
-        if (!isServiceBound || bluetoothService == null) {
-            Toast.makeText(requireContext(), "Bluetooth service not ready yet. Please wait...", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-        return true;
-    }
-
-    // Bluetooth discovery method
     private void startBluetoothDiscovery() {
-        if (!isBluetoothServiceAvailable()) {
+        if (!isServiceBound) {
+            // If service is not ready, set a flag and wait for onServiceConnected
+            startDiscoveryAfterBind = true;
+            Toast.makeText(requireContext(), "Initializing Bluetooth service...", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (bluetoothService == null || !bluetoothService.isBluetoothSupported()) {
+            Toast.makeText(requireContext(), "Bluetooth is not supported on this device.", Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (!bluetoothService.isBluetoothEnabled()) {
-            bluetoothService.enableBluetooth();
-            Toast.makeText(requireContext(), "Please enable Bluetooth", Toast.LENGTH_SHORT).show();
+            // Bluetooth is not enabled, request user to enable it.
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            enableBluetoothLauncher.launch(enableBtIntent);
+        } else {
+            // Bluetooth is already enabled, proceed with discovery.
+            startDiscoveryWithService();
+        }
+    }
+
+    private void startDiscoveryWithService() {
+        if (!isServiceBound || bluetoothService == null) {
+            Toast.makeText(requireContext(), "Bluetooth service not ready.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Show discovery dialog
+        nearbyDevices.clear();
         showDiscoveryDialog();
-
-        // Start discovery
+        updateDiscoveryDialog();
         bluetoothService.startDiscovery(new BluetoothService.BluetoothDiscoveryListener() {
             @Override
             public void onDeviceDiscovered(BluetoothDevice device) {
-                requireActivity().runOnUiThread(() -> {
-                    if (!nearbyDevices.contains(device)) {
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    // Check if device already exists in the list
+                    boolean deviceExists = false;
+                    for (BluetoothDevice existingDevice : nearbyDevices) {
+                        if (existingDevice.getAddress().equals(device.getAddress())) {
+                            deviceExists = true;
+                            break;
+                        }
+                    }
+
+                    if (!deviceExists) {
                         nearbyDevices.add(device);
                         updateDiscoveryDialog();
                     }
                 });
             }
 
+
+            @Override
+            public void onDiscoveryFinished() {
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    if (progressBar != null) {
+                        progressBar.setVisibility(View.GONE);
+                    }
+                    if (searchingText != null && nearbyDevices.isEmpty()) {
+                        searchingText.setText("No adventurers found nearby.");
+                    }
+                });
+            }
+
             @Override
             public void onDeviceConnected(BluetoothDevice device) {
-                requireActivity().runOnUiThread(() -> {
-                    if (ContextCompat.checkSelfPermission(requireContext(),
-                            Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                         Toast.makeText(requireContext(), "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(requireContext(), "Connected to device", Toast.LENGTH_SHORT).show();
-                        // Or request permission if needed
-                        ActivityCompat.requestPermissions(requireActivity(),
-                                new String[]{Manifest.permission.BLUETOOTH_CONNECT},
-                                REQUEST_BLUETOOTH_CONNECT);
                     }
                 });
             }
 
             @Override
             public void onFriendRequestReceived(String userId, String userName) {
-                requireActivity().runOnUiThread(() -> {
-                    showFriendRequestDialog(userId, userName);
-                });
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(() -> showFriendRequestDialog(userId, userName));
             }
 
             @Override
             public void onConnectionError(String message) {
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                });
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(() -> Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show());
             }
         });
     }
 
-    // Bluetooth dialog methods
     private void showDiscoveryDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext(), R.style.CustomAlertDialog);
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_bluetooth_discovery, null);
         builder.setView(dialogView);
 
-        // Initialize views
         searchingText = dialogView.findViewById(R.id.searching_text);
         progressBar = dialogView.findViewById(R.id.progress_bar);
         devicesRecyclerView = dialogView.findViewById(R.id.devices_recycler);
-        TextView title = dialogView.findViewById(R.id.dialog_title);
-        ImageView bluetoothIcon = dialogView.findViewById(R.id.bluetooth_icon);
 
-        // Set up recycler view
-        devicesAdapter = new BluetoothDeviceAdapter(nearbyDevices, device -> {
-            // Connect to selected device
+        // Initialize with empty list
+        devicesAdapter = new BluetoothDeviceAdapter(new ArrayList<>(), device -> {
             if (isServiceBound && bluetoothService != null) {
                 bluetoothService.connectToDevice(device);
                 if (discoveryDialog != null && discoveryDialog.isShowing()) {
@@ -384,21 +405,17 @@ public class HomeFragment extends Fragment {
         devicesRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         devicesRecyclerView.setAdapter(devicesAdapter);
 
-        // Set dialog properties
         discoveryDialog = builder.create();
         discoveryDialog.setCanceledOnTouchOutside(false);
         discoveryDialog.show();
 
-        // Customize dialog window
         Window window = discoveryDialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
 
-        // Set negative button
-        TextView cancelButton = dialogView.findViewById(R.id.cancel_button);
-        cancelButton.setOnClickListener(v -> {
+        dialogView.findViewById(R.id.cancel_button).setOnClickListener(v -> {
             if (isServiceBound && bluetoothService != null) {
                 bluetoothService.stopDiscovery();
             }
@@ -415,49 +432,32 @@ public class HomeFragment extends Fragment {
                 devicesRecyclerView.setVisibility(View.GONE);
                 progressBar.setVisibility(View.VISIBLE);
             } else {
-                searchingText.setText(nearbyDevices.size() + " adventurers nearby");
+                searchingText.setText(nearbyDevices.size() + " adventurer(s) nearby");
                 devicesRecyclerView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.GONE);
-                devicesAdapter.notifyDataSetChanged();
+
+                // Update the adapter with the new devices
+                devicesAdapter.updateDevices(nearbyDevices);
             }
         }
     }
 
     private void showFriendRequestDialog(String userId, String userName) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Friend Request");
-        builder.setMessage(userName + " wants to be your friend");
-        builder.setPositiveButton("Accept", (dialog, which) -> {
-            acceptFriendRequest(userId);
-        });
-        builder.setNegativeButton("Decline", (dialog, which) -> {
-            // Do nothing
-        });
-
-        AlertDialog dialog = builder.create();
-        dialog.show();
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Friend Request")
+                .setMessage(userName + " wants to be your friend")
+                .setPositiveButton("Accept", (dialog, which) -> acceptFriendRequest(userId))
+                .setNegativeButton("Decline", null)
+                .show();
     }
 
     private void acceptFriendRequest(String userId) {
-        // Add friend to Firebase
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            mDatabase.child("friends").child(currentUser.getUid()).child(userId).setValue(true);
-            mDatabase.child("friends").child(userId).child(currentUser.getUid()).setValue(true);
+            String currentUid = currentUser.getUid();
+            mDatabase.child("friends").child(currentUid).child(userId).setValue(true);
+            mDatabase.child("friends").child(userId).child(currentUid).setValue(true);
             Toast.makeText(requireContext(), "Friend added!", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (isServiceBound) {
-            try {
-                requireContext().unbindService(serviceConnection);
-            } catch (Exception e) {
-                Log.e(TAG, "Error unbinding service", e);
-            }
-            isServiceBound = false;
         }
     }
 
