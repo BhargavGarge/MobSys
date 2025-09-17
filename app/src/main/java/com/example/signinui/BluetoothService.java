@@ -22,13 +22,20 @@ import androidx.core.app.ActivityCompat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class BluetoothService extends Service {
     private static final String TAG = "BluetoothService";
     private static final String APP_NAME = "AdventureApp";
     private static final UUID MY_UUID = UUID.fromString("a60f35f0-b93a-11de-8a39-08002009c666");
-
+    // Add these variables to BluetoothService class
+    private Set<String> pairedFriends = new HashSet<>();
+    private Map<String, Boolean> friendOnlineStatus = new HashMap<>();
+    private Map<String, BluetoothDevice> connectedDevices = new HashMap<>();
     private final IBinder binder = new LocalBinder();
     private BluetoothAdapter bluetoothAdapter;
     private AcceptThread acceptThread;
@@ -41,9 +48,13 @@ public class BluetoothService extends Service {
 
     public interface BluetoothDiscoveryListener {
         void onDeviceDiscovered(BluetoothDevice device);
+        void onPartnerUIDReceived(String uid);
         void onDiscoveryFinished();
         void onDeviceConnected(BluetoothDevice device);
         void onFriendRequestReceived(String userId, String userName);
+
+        void onFriendPaired(String userId, boolean success);
+
         void onConnectionError(String message);
     }
 
@@ -52,7 +63,22 @@ public class BluetoothService extends Service {
             return BluetoothService.this;
         }
     }
-
+    // Add these methods to BluetoothService class
+    public Set<String> getPairedFriends() {
+        return new HashSet<>(pairedFriends);
+    }
+    public Map<String, Boolean> getFriendOnlineStatus() {
+        return new HashMap<>(friendOnlineStatus);
+    }
+    public int getNearbyFriendCount() {
+        int count = 0;
+        for (Boolean online : friendOnlineStatus.values()) {
+            if (online != null && online) {
+                count++;
+            }
+        }
+        return count;
+    }
     @Override
     public IBinder onBind(Intent intent) {
         return binder;
@@ -312,7 +338,12 @@ public class BluetoothService extends Service {
                 socket = null;
             }
         }
-
+        public void sendUserUID(String uid) {
+            if (connectedThread != null) {
+                String message = "UID_EXCHANGE:" + uid;
+                connectedThread.write(message.getBytes());
+            }
+        }
         public void run() {
             if (socket == null) {
                 Log.e(TAG, "Socket is null, cannot connect.");
@@ -358,7 +389,75 @@ public class BluetoothService extends Service {
             }
         }
     }
+    // Modify the processMessage method to handle friend pairing responses
+    private void processMessage(String message) {
+        if (message.startsWith("FRIEND_REQUEST:")) {
+            String[] parts = message.split(":", 3);
+            if (parts.length == 3) {
+                handler.post(() -> {
+                    if (discoveryListener != null) {
+                        discoveryListener.onFriendRequestReceived(parts[1], parts[2]);
+                    }
+                });
+            }
+        } else if (message.startsWith("FRIEND_ACCEPT:")) {
+            String[] parts = message.split(":", 2);
+            if (parts.length == 2) {
+                String userId = parts[1];
+                pairedFriends.add(userId);
+                friendOnlineStatus.put(userId, true);
 
+                handler.post(() -> {
+                    if (discoveryListener != null) {
+                        discoveryListener.onFriendPaired(userId, true);
+                    }
+                });
+            }
+        } else if (message.startsWith("HEARTBEAT:")) {
+            String[] parts = message.split(":", 2);
+            if (parts.length == 2) {
+                String userId = parts[1];
+                friendOnlineStatus.put(userId, true);
+            }
+        }
+        if (message.startsWith("UID_EXCHANGE:")) {
+            String uid = message.substring(13); // Get text after "UID_EXCHANGE:"
+            handler.post(() -> {
+                if (discoveryListener != null) {
+                    discoveryListener.onPartnerUIDReceived(uid);
+                }
+            });
+        }
+    }
+    public void sendHeartbeat(String userId) {
+        if (connectedThread != null) {
+            String message = "HEARTBEAT:" + userId;
+            connectedThread.write(message.getBytes());
+        }
+    }
+
+    // Add method to send friend acceptance
+    public void sendFriendAccept(String userId) {
+        if (connectedThread != null) {
+            String message = "FRIEND_ACCEPT:" + userId;
+            connectedThread.write(message.getBytes());
+        }
+    }
+    public void sendUserUID(String uid) {
+        if (connectedThread != null) {
+            // Use a prefix to identify the message type
+            String message = "UID_EXCHANGE:" + uid;
+            connectedThread.write(message.getBytes());
+        }
+    }
+
+    public void sendChatMessage(String chatMessage) {
+        if (connectedThread != null) {
+            // Use a prefix for chat messages
+            String message = "CHAT:" + chatMessage;
+            connectedThread.write(message.getBytes());
+        }
+    }
     private class ConnectedThread extends Thread {
         private final BluetoothSocket socket;
         private final InputStream inputStream;
@@ -385,7 +484,7 @@ public class BluetoothService extends Service {
                 try {
                     bytes = inputStream.read(buffer);
                     String message = new String(buffer, 0, bytes);
-                    processMessage(message);
+                    BluetoothService.this.processMessage(message);
                 } catch (IOException e) {
                     Log.d(TAG, "Input stream was disconnected", e);
                     break;
@@ -393,18 +492,7 @@ public class BluetoothService extends Service {
             }
         }
 
-        private void processMessage(String message) {
-            if (message.startsWith("FRIEND_REQUEST:")) {
-                String[] parts = message.split(":", 3);
-                if (parts.length == 3) {
-                    handler.post(() -> {
-                        if (discoveryListener != null) {
-                            discoveryListener.onFriendRequestReceived(parts[1], parts[2]);
-                        }
-                    });
-                }
-            }
-        }
+
 
         public void write(byte[] bytes) {
             try {

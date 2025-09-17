@@ -17,12 +17,29 @@
         android:padding="16dp"
         android:background="?android:attr/selectableItemBackground">
 
-        <ImageView
-            android:id="@+id/device_icon"
+        <!-- Container for device icon and online status indicator -->
+        <RelativeLayout
             android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_person"
-            app:tint="#3B82F6" />
+            android:layout_height="40dp">
+
+            <ImageView
+                android:id="@+id/device_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_person"
+                app:tint="#3B82F6" />
+
+            <!-- Online status indicator (green/red dot) -->
+            <ImageView
+                android:id="@+id/online_status"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_alignBottom="@id/device_icon"
+                android:layout_alignEnd="@id/device_icon"
+                android:layout_marginBottom="2dp"
+                android:layout_marginEnd="2dp"
+                android:src="@drawable/ic_online" />
+        </RelativeLayout>
 
         <LinearLayout
             android:layout_width="0dp"

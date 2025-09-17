@@ -16,7 +16,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,7 +25,6 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -36,7 +34,6 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.JsonObjectRequest;
@@ -52,19 +49,19 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
-
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
-
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
+
 
 public class HomeFragment extends Fragment {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
@@ -74,12 +71,18 @@ public class HomeFragment extends Fragment {
     private TextView userNameHero;
     private DatabaseReference mDatabase;
     private FirebaseAuth mAuth;
-
+    private String partnerUid = null;
     // RecyclerView components for routes
     private RecyclerView recyclerView;
     private RecyclerView devicesRecyclerView;
+
+
     private FeaturedRouteAdapter routeAdapter;
     private List<Route> routeList = new ArrayList<>();
+    // Add these variables to HomeFragment class
+    private TextView friendCountText;
+    private Handler heartbeatHandler = new Handler();
+    private Runnable heartbeatRunnable;
 
     // Weather API constants
     private static final String API_KEY = "9bd3c0f117e2da1a013b82af5e348ba8";
@@ -93,7 +96,7 @@ public class HomeFragment extends Fragment {
 
     // Tag for logging
     private static final String TAG = "HomeFragment";
-
+    Map<String, Boolean> onlineStatusMap = new HashMap<>();
     // Add these new constants for better image variety
     private static final String[] HIKING_IMAGES = {
             "https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&auto=format&fit=crop",
@@ -134,6 +137,7 @@ public class HomeFragment extends Fragment {
     private BluetoothDeviceAdapter devicesAdapter;
     private TextView searchingText;
     private ProgressBar progressBar;
+    private Map<String, String> deviceNameMap = new HashMap<>();
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -188,7 +192,8 @@ public class HomeFragment extends Fragment {
         weatherIcon = view.findViewById(R.id.weather_icon);
         temperatureText = view.findViewById(R.id.temperature_text);
         userNameHero = view.findViewById(R.id.user_name_hero);
-
+        // In onCreateView, initialize the friend count text
+        friendCountText = view.findViewById(R.id.friend_count_text);
         // Initialize RecyclerView for routes
         recyclerView = view.findViewById(R.id.featured_routes_recycler);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext(),
@@ -231,6 +236,9 @@ public class HomeFragment extends Fragment {
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);
             isServiceBound = false;
+        }
+        if (heartbeatHandler != null && heartbeatRunnable != null) {
+            heartbeatHandler.removeCallbacks(heartbeatRunnable);
         }
     }
 
@@ -312,7 +320,13 @@ public class HomeFragment extends Fragment {
             startDiscoveryWithService();
         }
     }
-
+    // Add this method to update friend count
+    private void updateFriendCount() {
+        if (bluetoothService != null) {
+            int count = bluetoothService.getNearbyFriendCount();
+            friendCountText.setText(count + " friends nearby");
+        }
+    }
     private void startDiscoveryWithService() {
         if (!isServiceBound || bluetoothService == null) {
             Toast.makeText(requireContext(), "Bluetooth service not ready.", Toast.LENGTH_SHORT).show();
@@ -327,6 +341,21 @@ public class HomeFragment extends Fragment {
             public void onDeviceDiscovered(BluetoothDevice device) {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(() -> {
+                    String deviceName;
+                    if (ContextCompat.checkSelfPermission(requireContext(),
+                            Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                        deviceName = device.getName();
+                    } else {
+                        deviceName = "Bluetooth Device";
+                    }
+
+                    if (deviceName == null || deviceName.isEmpty()) {
+                        deviceName = "Unknown Device";
+                    }
+
+                    // Create a wrapper object or store names in a map
+                    deviceNameMap.put(device.getAddress(), deviceName);
+
                     // Check if device already exists in the list
                     boolean deviceExists = false;
                     for (BluetoothDevice existingDevice : nearbyDevices) {
@@ -361,18 +390,43 @@ public class HomeFragment extends Fragment {
             public void onDeviceConnected(BluetoothDevice device) {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(() -> {
-                    if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        Toast.makeText(requireContext(), "Connected to " + device.getName(), Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(requireContext(), "Connected to device", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "Connected! Exchanging info...", Toast.LENGTH_SHORT).show();
+
+                    // When connected, send your own UID
+                    FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                    if (currentUser != null && bluetoothService != null) {
+                        bluetoothService.sendUserUID(currentUser.getUid());
                     }
                 });
             }
+            @Override
+            public void onPartnerUIDReceived(String uid) {
+                HomeFragment.this.partnerUid = uid;
+                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
 
+                if (currentUser != null && HomeFragment.this.partnerUid != null) {
+                    Intent intent = new Intent(requireContext(), ChatActivity.class);
+                    intent.putExtra("CURRENT_USER_UID", currentUser.getUid());
+                    intent.putExtra("PARTNER_UID", HomeFragment.this.partnerUid);
+                    startActivity(intent);
+                }
+            }
             @Override
             public void onFriendRequestReceived(String userId, String userName) {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(() -> showFriendRequestDialog(userId, userName));
+            }
+            @Override
+            public void onFriendPaired(String userId, boolean success) {
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    if (success) {
+                        Toast.makeText(requireContext(), "Friend paired successfully!", Toast.LENGTH_SHORT).show();
+                        updateFriendCount();
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to pair with friend", Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
 
             @Override
@@ -393,11 +447,14 @@ public class HomeFragment extends Fragment {
         devicesRecyclerView = dialogView.findViewById(R.id.devices_recycler);
 
         // Initialize with empty list
-        devicesAdapter = new BluetoothDeviceAdapter(new ArrayList<>(), device -> {
-            if (isServiceBound && bluetoothService != null) {
-                bluetoothService.connectToDevice(device);
-                if (discoveryDialog != null && discoveryDialog.isShowing()) {
-                    discoveryDialog.dismiss();
+        devicesAdapter = new BluetoothDeviceAdapter(new ArrayList<>(), onlineStatusMap, new BluetoothDeviceAdapter.OnDeviceClickListener() {
+            @Override
+            public void onDeviceClick(BluetoothDevice device) {
+                if (isServiceBound && bluetoothService != null) {
+                    bluetoothService.connectToDevice(device);
+                    if (discoveryDialog != null && discoveryDialog.isShowing()) {
+                        discoveryDialog.dismiss();
+                    }
                 }
             }
         });
@@ -436,8 +493,16 @@ public class HomeFragment extends Fragment {
                 devicesRecyclerView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.GONE);
 
-                // Update the adapter with the new devices
-                devicesAdapter.updateDevices(nearbyDevices);
+                // Update the adapter with the new devices and their online status
+                // You need to provide the onlineStatusMap as the second argument
+                Map<String, Boolean> onlineStatusMap = new HashMap<>();
+                // Populate the onlineStatusMap with appropriate values
+                for (BluetoothDevice device : nearbyDevices) {
+                    // Set appropriate online status for each device
+                    onlineStatusMap.put(device.getAddress(), true); // Or determine based on your logic
+                }
+
+                devicesAdapter.updateDevices(nearbyDevices, onlineStatusMap);
             }
         }
     }
@@ -451,16 +516,39 @@ public class HomeFragment extends Fragment {
                 .show();
     }
 
+    // Modify the acceptFriendRequest method
     private void acceptFriendRequest(String userId) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             String currentUid = currentUser.getUid();
             mDatabase.child("friends").child(currentUid).child(userId).setValue(true);
             mDatabase.child("friends").child(userId).child(currentUid).setValue(true);
+
+            // Notify the other device about the pairing
+            if (bluetoothService != null) {
+                bluetoothService.sendFriendAccept(userId);
+            }
+
             Toast.makeText(requireContext(), "Friend added!", Toast.LENGTH_SHORT).show();
+            updateFriendCount();
         }
     }
+    // Add heartbeat mechanism to track online status
+    private void startHeartbeat() {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
 
+        heartbeatRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (bluetoothService != null) {
+                    bluetoothService.sendHeartbeat(currentUser.getUid());
+                }
+                heartbeatHandler.postDelayed(this, 30000); // Send every 30 seconds
+            }
+        };
+        heartbeatHandler.postDelayed(heartbeatRunnable, 30000);
+    }
     private void loadUserData() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
