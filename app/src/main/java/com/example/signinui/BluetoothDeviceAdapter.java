@@ -36,8 +36,7 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
 
     // Initialize with empty list and online status map
     public static BluetoothDeviceAdapter createWithEmptyList(OnDeviceClickListener listener) {
-        Map<String, Boolean> onlineStatusMap = new HashMap<>();
-        return new BluetoothDeviceAdapter(new ArrayList<>(), onlineStatusMap, listener);
+        return new BluetoothDeviceAdapter(new ArrayList<>(), new HashMap<>(), listener);
     }
 
     @NonNull
@@ -51,7 +50,6 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
     @Override
     public void onBindViewHolder(@NonNull DeviceViewHolder holder, int position) {
         BluetoothDevice device = devices.get(position);
-        // Get online status for this device (default to false if not set)
         boolean isOnline = onlineStatusMap.getOrDefault(device.getAddress(), false);
         holder.bind(device, listener, isOnline);
     }
@@ -69,8 +67,6 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
         notifyDataSetChanged();
     }
 
-
-    // Add this method to update online status for a specific device
     public void setOnlineStatus(String deviceAddress, boolean isOnline) {
         onlineStatusMap.put(deviceAddress, isOnline);
         notifyDataSetChanged();
@@ -90,58 +86,74 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
             onlineStatus = itemView.findViewById(R.id.online_status);
         }
 
-        public void bind(BluetoothDevice device, OnDeviceClickListener listener, boolean isOnline) {
-            String name;
+        public void bind(final BluetoothDevice device, final OnDeviceClickListener listener, boolean isOnline) {
+            String name = "Unknown Device";
+            String bondStateText = "";
 
             // Check for BLUETOOTH_CONNECT permission before accessing device name
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                if (ContextCompat.checkSelfPermission(itemView.getContext(),
-                        Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                    name = device.getName();
-                } else {
-                    name = "Bluetooth Device";
+            if (ContextCompat.checkSelfPermission(itemView.getContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                String deviceNameStr = device.getName();
+                if (deviceNameStr != null && !deviceNameStr.isEmpty()) {
+                    name = deviceNameStr;
+                }
+
+                // Add bond state information
+                switch (device.getBondState()) {
+                    case BluetoothDevice.BOND_BONDED:
+                        bondStateText = " (Paired)";
+                        break;
+                    case BluetoothDevice.BOND_BONDING:
+                        bondStateText = " (Pairing...)";
+                        break;
+                    case BluetoothDevice.BOND_NONE:
+                        bondStateText = " (Not paired)";
+                        break;
                 }
             } else {
-                // For older Android versions, we can access the name directly
-                name = device.getName();
+                name = "Permission required";
             }
 
-            if (name == null || name.isEmpty()) {
-                name = "Unknown Device";
-            }
-            deviceName.setText(name);
+            deviceName.setText(name + bondStateText);
 
-            String status = isOnline ? "Online • Tap to connect" : "Offline • Not available";
+            // Enhanced status text
+            String status;
+            if (isOnline) {
+                if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+                    status = "Online • Tap to connect";
+                } else {
+                    status = "Online • Will pair & connect";
+                }
+            } else {
+                status = "Offline • Not available";
+            }
             deviceStatus.setText(status);
 
-            // Set online status indicator
+            // Set appropriate online/offline status icon
             if (isOnline) {
-                onlineStatus.setImageResource(R.drawable.ic_online); // Green dot
+                onlineStatus.setImageResource(R.drawable.ic_online);
             } else {
-                onlineStatus.setImageResource(R.drawable.ic_offline); // Red dot
+                onlineStatus.setImageResource(R.drawable.ic_offline);
             }
 
+            // Enhanced click handling with bond state awareness
             itemView.setOnClickListener(v -> {
                 if (listener != null && isOnline) {
-                    // Check permission before attempting to connect
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                        if (ContextCompat.checkSelfPermission(itemView.getContext(),
-                                Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                            listener.onDeviceClick(device);
-                        } else {
-                            Toast.makeText(itemView.getContext(),
-                                    "Bluetooth permission required to connect",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    } else {
-                        listener.onDeviceClick(device);
-                    }
+                    listener.onDeviceClick(device);
+                } else if (!isOnline) {
+                    Toast.makeText(itemView.getContext(), "Device is offline", Toast.LENGTH_SHORT).show();
                 }
             });
 
-            // Disable click if offline
+            // Visual feedback based on status
             itemView.setEnabled(isOnline);
             itemView.setAlpha(isOnline ? 1.0f : 0.6f);
+
+            // Add visual distinction for paired devices
+            if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+                itemView.setBackgroundResource(R.drawable.bg_paired_device); // You'll need to create this drawable
+            } else {
+                itemView.setBackgroundResource(R.drawable.bg_unpaired_device); // You'll need to create this drawable
+            }
         }
     }
 }
