@@ -22,7 +22,6 @@ import androidx.core.app.ActivityCompat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -35,7 +34,7 @@ public class BluetoothService extends Service {
     // =============================================================================================
     private static final String TAG = "BluetoothService";
     private static final String APP_NAME = "AdventureApp";
-    // Using well-known SPP UUID for better compatibility
+    // Using well-known SPP UUID for better compatibility. Both client and server MUST use the same UUID.
     private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     private final IBinder binder = new LocalBinder();
@@ -205,7 +204,7 @@ public class BluetoothService extends Service {
         try {
             unregisterReceiver(discoveryReceiver);
         } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Discovery receiver was not registered.", e);
+            // This is expected if the receiver was already unregistered.
         }
     }
 
@@ -222,11 +221,6 @@ public class BluetoothService extends Service {
         String deviceName = device.getName() != null ? device.getName() : "Unknown Device";
         Log.d(TAG, "Preparing to connect to device: " + deviceName + " (" + device.getAddress() + ")");
 
-        // Check if device is bonded (paired)
-        if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
-            Log.w(TAG, "Device is not bonded. This might cause connection issues.");
-        }
-
         // Cancel any thread attempting to make a connection
         if (connectThread != null) {
             connectThread.cancel();
@@ -239,12 +233,9 @@ public class BluetoothService extends Service {
             connectedThread = null;
         }
 
-        // Add a small delay to ensure cleanup is complete
-        handler.postDelayed(() -> {
-            // Start the thread to connect with the given device
-            connectThread = new ConnectThread(device);
-            connectThread.start();
-        }, 500);
+        // Start the thread to connect with the given device
+        connectThread = new ConnectThread(device);
+        connectThread.start();
     }
 
     /**
@@ -274,6 +265,9 @@ public class BluetoothService extends Service {
         // Notify the UI that the connection was successful
         handler.post(() -> {
             if (discoveryListener != null) {
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
                 discoveryListener.onDeviceConnected(device);
             }
         });
@@ -282,6 +276,21 @@ public class BluetoothService extends Service {
         connectedThread = new ConnectedThread(socket);
         connectedThread.start();
     }
+
+    private void connectionFailed() {
+        Log.e(TAG, "Connection failed. Restarting server to listen for new connections.");
+        // Connection failed, restart the server to listen again
+        notifyError("Failed to connect to device");
+        startServer();
+    }
+
+    private void connectionLost() {
+        Log.e(TAG, "Connection lost. Restarting server to listen for new connections.");
+        // Connection was lost, restart the server to listen again
+        notifyError("Device connection was lost");
+        startServer();
+    }
+
 
     // =============================================================================================
     // Data Transmission Methods
@@ -325,14 +334,6 @@ public class BluetoothService extends Service {
     // =============================================================================================
     // Friend Data Getters
     // =============================================================================================
-
-    public Set<String> getPairedFriends() {
-        return new HashSet<>(pairedFriends);
-    }
-
-    public Map<String, Boolean> getFriendOnlineStatus() {
-        return new HashMap<>(friendOnlineStatus);
-    }
 
     public int getNearbyFriendCount() {
         int count = 0;
@@ -419,7 +420,8 @@ public class BluetoothService extends Service {
     // =============================================================================================
 
     /**
-     * Enhanced AcceptThread with better error handling
+     * This thread runs while listening for incoming connections. It behaves
+     * like a server-side client.
      */
     private class AcceptThread extends Thread {
         private final BluetoothServerSocket serverSocket;
@@ -432,48 +434,37 @@ public class BluetoothService extends Service {
                     Log.e(TAG, "BLUETOOTH_CONNECT permission not granted for AcceptThread.");
                     tmp = null;
                 } else {
-                    // Try insecure connection for better compatibility
+                    // Use insecure connection for better compatibility across different Android devices.
                     tmp = bluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord(APP_NAME, MY_UUID);
-                    Log.d(TAG, "Server socket created successfully with UUID: " + MY_UUID);
+                    Log.d(TAG, "Server socket created successfully (insecure) with UUID: " + MY_UUID);
                 }
             } catch (IOException e) {
                 Log.e(TAG, "Socket's listen() method failed", e);
+                tmp = null;
             }
             serverSocket = tmp;
         }
 
+
         public void run() {
             if (serverSocket == null) {
-                Log.e(TAG, "Server socket is null, cannot accept connections");
+                Log.e(TAG, "Server socket is null, cannot accept connections.");
+                return;
+            }
+            BluetoothSocket socket = null;
+            Log.d(TAG, "Server socket listening for connections...");
+            try {
+                // This is a blocking call and will only return on a successful connection or an exception
+                socket = serverSocket.accept();
+            } catch (IOException e) {
+                Log.d(TAG, "Socket accept() failed or was cancelled.", e);
                 return;
             }
 
-            BluetoothSocket socket = null;
-            Log.d(TAG, "Server socket listening for connections...");
-
-            // Keep listening until an exception occurs or a socket is returned
-            while (true) {
-                try {
-                    Log.d(TAG, "Waiting for incoming connection...");
-                    socket = serverSocket.accept();
-                    Log.d(TAG, "Incoming connection accepted from: " + socket.getRemoteDevice().getAddress());
-                } catch (IOException e) {
-                    Log.d(TAG, "Socket accept() failed or was cancelled.", e);
-                    break;
-                }
-
-                if (socket != null) {
-                    Log.d(TAG, "A connection was accepted from device: " + socket.getRemoteDevice().getAddress());
+            // A connection was accepted
+            if (socket != null) {
+                synchronized (BluetoothService.this) {
                     manageConnectedSocket(socket, socket.getRemoteDevice());
-
-                    // Close the server socket as we are connecting to a single device
-                    try {
-                        serverSocket.close();
-                        Log.d(TAG, "Server socket closed after accepting connection");
-                    } catch (IOException e) {
-                        Log.e(TAG, "Could not close the server socket", e);
-                    }
-                    break;
                 }
             }
         }
@@ -491,13 +482,13 @@ public class BluetoothService extends Service {
     }
 
     /**
-     * Enhanced ConnectThread with retry logic and fallback socket creation
+     * This thread runs while attempting to make an outgoing connection
+     * with a device. It runs straight through; the connection either
+     * succeeds or fails.
      */
     private class ConnectThread extends Thread {
         private final BluetoothSocket socket;
         private final BluetoothDevice device;
-        private static final int MAX_RETRIES = 3;
-        private static final long RETRY_DELAY = 1000; // 1 second
 
         public ConnectThread(BluetoothDevice device) {
             this.device = device;
@@ -507,126 +498,60 @@ public class BluetoothService extends Service {
                 if (ActivityCompat.checkSelfPermission(BluetoothService.this, Manifest.permission.BLUETOOTH_CONNECT)
                         != PackageManager.PERMISSION_GRANTED) {
                     Log.e(TAG, "BLUETOOTH_CONNECT permission not granted for ConnectThread.");
+                    tmp = null;
                 } else {
-                    // Try multiple connection methods in sequence
-
-                    // 1. Try standard secure connection first
-                    try {
-                        tmp = device.createRfcommSocketToServiceRecord(MY_UUID);
-                        Log.d(TAG, "Created secure socket for device: " + device.getAddress());
-                    } catch (IOException e) {
-                        Log.w(TAG, "Secure socket creation failed, trying insecure method", e);
-
-                        // 2. Try insecure connection
-                        try {
-                            tmp = device.createInsecureRfcommSocketToServiceRecord(MY_UUID);
-                            Log.d(TAG, "Created insecure socket for device: " + device.getAddress());
-                        } catch (IOException e2) {
-                            Log.w(TAG, "Insecure socket creation also failed, trying reflection", e2);
-
-                            // 3. Try reflection method with multiple channels
-                            tmp = createSocketUsingReflection(device);
-                            if (tmp == null) {
-                                Log.e(TAG, "All socket creation methods failed");
-                            }
-                        }
-                    }
+                    // Prioritize createInsecureRfcommSocketToServiceRecord
+                    tmp = device.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+                    Log.d(TAG, "Created insecure client socket.");
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Unexpected error in socket creation", e);
+            } catch (IOException e) {
+                Log.e(TAG, "Insecure socket creation failed", e);
+                tmp = null;
             }
             socket = tmp;
-        }
-
-        private BluetoothSocket createSocketUsingReflection(BluetoothDevice device) {
-            try {
-                // Try multiple RFCOMM channels (1-30) as different devices use different channels
-                for (int channel = 1; channel <= 30; channel++) {
-                    try {
-                        Method m = device.getClass().getMethod("createRfcommSocket", int.class);
-                        BluetoothSocket socket = (BluetoothSocket) m.invoke(device, channel);
-                        Log.d(TAG, "Created reflection socket on channel " + channel + " for device: " + device.getAddress());
-                        return socket;
-                    } catch (Exception e) {
-                        Log.d(TAG, "Failed to create socket on channel " + channel, e);
-                    }
-                }
-                Log.e(TAG, "All reflection socket creation attempts failed");
-                return null;
-            } catch (Exception e) {
-                Log.e(TAG, "Reflection socket creation failed", e);
-                return null;
-            }
         }
 
         public void run() {
             if (socket == null) {
                 Log.e(TAG, "Socket is null, cannot connect.");
-                notifyError("Socket creation failed.");
+                connectionFailed();
                 return;
             }
 
-            // Add delay before connection attempt
-            try {
-                Thread.sleep(1000); // Wait 1 second
-            } catch (InterruptedException e) {
-                return;
-            }
-
-            // Stop discovery because it will slow down the connection
+            // Always cancel discovery because it will slow down a connection
             stopDiscovery();
 
-            int retryCount = 0;
-            boolean connected = false;
+            try {
+                // This is a blocking call and will only return on a successful connection or an exception
+                Log.d(TAG, "Attempting to connect to device...");
+                socket.connect();
+                Log.d(TAG, "Connection successful!");
 
-            // Get device name safely with permission check
-            String deviceIdentifier = device.getAddress(); // Default to address
-            if (ActivityCompat.checkSelfPermission(BluetoothService.this,
-                    Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                if (device.getName() != null) {
-                    deviceIdentifier = device.getName();
-                }
-            }
-
-            while (retryCount < MAX_RETRIES && !connected) {
-                try {
-                    Log.d(TAG, "Connection attempt " + (retryCount + 1) + " to " + deviceIdentifier);
-
-                    socket.connect();
-                    connected = true;
-                    Log.d(TAG, "Successfully connected on attempt " + (retryCount + 1));
-
-                    // Connection successful, manage the socket
-                    manageConnectedSocket(socket, device);
-
-                } catch (IOException connectException) {
-                    Log.w(TAG, "Connection attempt " + (retryCount + 1) + " failed", connectException);
-                    retryCount++;
-
-                    if (retryCount < MAX_RETRIES) {
-                        try {
-                            Thread.sleep(RETRY_DELAY);
-                        } catch (InterruptedException e) {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!connected) {
-                Log.e(TAG, "Failed to connect after " + MAX_RETRIES + " attempts");
+            } catch (IOException connectException) {
+                Log.e(TAG, "Connection failed", connectException);
                 try {
                     socket.close();
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket", closeException);
                 }
-                notifyError("Failed to connect to device after multiple attempts");
+                connectionFailed();
+                return;
             }
+
+            // Reset the ConnectThread because we're done
+            synchronized (BluetoothService.this) {
+                connectThread = null;
+            }
+
+            // Start the connected thread
+            manageConnectedSocket(socket, device);
         }
 
         public void cancel() {
             try {
-                if (socket != null) socket.close();
+                if (socket != null) {
+                    socket.close();
+                }
             } catch (IOException e) {
                 Log.e(TAG, "Could not close the client socket", e);
             }
@@ -653,7 +578,7 @@ public class BluetoothService extends Service {
             }
             inputStream = tmpIn;
             outputStream = tmpOut;
-            Log.d(TAG, "ConnectedThread created for device: " + socket.getRemoteDevice().getAddress());
+            Log.d(TAG, "ConnectedThread created.");
         }
 
         public void run() {
@@ -666,8 +591,7 @@ public class BluetoothService extends Service {
                     processMessage(message);
                 } catch (IOException e) {
                     Log.d(TAG, "Input stream was disconnected", e);
-                    // Connection lost, restart the server to listen again
-                    startServer();
+                    connectionLost();
                     break;
                 }
             }
@@ -684,7 +608,9 @@ public class BluetoothService extends Service {
 
         public void cancel() {
             try {
-                if (socket != null) socket.close();
+                if (socket != null) {
+                    socket.close();
+                }
                 Log.d(TAG, "ConnectedThread socket closed");
             } catch (IOException e) {
                 Log.e(TAG, "Could not close the connect socket", e);
