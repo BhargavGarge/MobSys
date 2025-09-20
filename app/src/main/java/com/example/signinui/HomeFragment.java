@@ -43,6 +43,7 @@ import com.example.signinui.model.Route;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -163,6 +164,7 @@ public class HomeFragment extends Fragment {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         checkLocationPermissionAndFetchData();
         view.findViewById(R.id.find_friends_button).setOnClickListener(v -> checkPermissionsAndStartDiscovery());
+        view.findViewById(R.id.find_friends_button).setOnClickListener(v -> showFriendDiscoveryInfoDialog());
         bindBluetoothService();
         return view;
     }
@@ -498,7 +500,40 @@ public class HomeFragment extends Fragment {
             }
         });
     }
+    private void showFriendDiscoveryInfoDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext(), R.style.CustomAlertDialog);
+        LayoutInflater inflater = requireActivity().getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.dialog_friend_discovery_info, null);
 
+        builder.setView(dialogView);
+
+        // Create the dialog
+        AlertDialog infoDialog = builder.create();
+        infoDialog.setCanceledOnTouchOutside(true);
+
+        // Get button references
+        MaterialButton btnCancel = dialogView.findViewById(R.id.btn_cancel_discovery);
+        MaterialButton btnStartDiscovery = dialogView.findViewById(R.id.btn_start_discovery);
+
+        // Set up click listeners
+        btnCancel.setOnClickListener(v -> infoDialog.dismiss());
+
+        btnStartDiscovery.setOnClickListener(v -> {
+            infoDialog.dismiss();
+            // Proceed with the original discovery flow
+            checkPermissionsAndStartDiscovery();
+        });
+
+        // Show the dialog
+        infoDialog.show();
+
+        // Set dialog window properties for rounded corners
+        Window window = infoDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
     private void showDiscoveryDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext(), R.style.CustomAlertDialog);
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_bluetooth_discovery, null);

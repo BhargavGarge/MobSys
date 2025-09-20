@@ -462,37 +462,7 @@
                         android:textStyle="bold"/>
 
                     <!-- Dark Mode -->
-                    <LinearLayout
-                        android:id="@+id/dark_mode_item"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
 
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_dark"
-                            app:tint="#666666"/>
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:text="Dark Mode"
-                            android:fontFamily="@font/seg_ui_semibold"
-                            android:textColor="#2C2C2C"
-                            android:textSize="16sp"/>
-
-                        <Switch
-                            android:id="@+id/dark_mode_switch"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="false"/>
-                    </LinearLayout>
 
                     <!-- Support Header -->
                     <TextView
