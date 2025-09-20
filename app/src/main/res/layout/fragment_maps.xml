@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/gradient_header"
+    android:background="@drawable/gradient_header_enhanced"
     android:fillViewport="true">
 
     <LinearLayout
@@ -41,7 +41,8 @@
                     android:layout_weight="1"
                     android:text="Explore Routes"
                     android:textColor="@android:color/white"
-                    android:textSize="20sp"
+                    android:fontFamily="@font/segoe_ui_bold"
+                    android:textSize="24sp"
                     android:textStyle="bold"
                     android:gravity="center" />
 
@@ -49,54 +50,7 @@
 
             </LinearLayout>
 
-            <!-- Enhanced Search Bar -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/search_background"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="12dp">
 
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_search"
-                    app:tint="#666666" />
-
-                <EditText
-                    android:id="@+id/search_edit_text"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:background="@null"
-                    android:hint="Search trails, routes, or destinations..."
-                    android:textColor="#2C2C2C"
-                    android:textColorHint="#999999"
-                    android:textSize="16sp"
-                    android:imeOptions="actionSearch"
-                    android:inputType="text" />
-
-                <ImageButton
-                    android:id="@+id/clear_search_btn"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:background="@null"
-                    android:src="@drawable/ic_clear"
-                    app:tint="#666666"
-                    android:visibility="gone" />
-
-                <ImageButton
-                    android:id="@+id/filter_btn"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@null"
-                    android:src="@drawable/ic_filter"
-                    app:tint="#666666" />
-
-            </LinearLayout>
 
         </LinearLayout>
 
@@ -120,7 +74,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Select Trail Type"
-                    android:textColor="#2C2C2C"
+                    android:fontFamily="@font/segoe_ui_bold"
+                    android:textColor="@android:color/white"
+                    
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp" />
