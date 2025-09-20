@@ -9,16 +9,14 @@
         android:icon="@drawable/ic_route"
         android:title="Routes"/>
     <item
+        android:id="@+id/nav_feed"
+        android:icon="@drawable/ic_feed"
+        android:title="Feed"/>
+    <item
         android:id="@+id/nav_profile"
         android:icon="@drawable/ic_person"
         android:title="Profile"/>
 
-    <item
-        android:id="@+id/nav_steps"
-        android:icon="@drawable/ic_walk"
-        android:title="Steps"/>
-    <item
-        android:id="@+id/nav_feed"
-        android:icon="@drawable/ic_feed"
-        android:title="Feed"/>
+
+
 </menu>

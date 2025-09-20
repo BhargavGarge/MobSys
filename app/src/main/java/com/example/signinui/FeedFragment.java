@@ -3,17 +3,16 @@ package com.example.signinui;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ContentResolver;
-import android.content.ContentValues;
+
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.location.Address;
-import android.location.Geocoder;
-import android.location.Location;
+
 import android.net.Uri;
-import android.os.Build;
+
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -67,6 +66,8 @@ import java.util.Locale;
 
 public class FeedFragment extends Fragment {
 
+    private static final String TAG = "FeedFragment";
+
     private RecyclerView recyclerView;
     private FeedAdapter adapter;
     private List<FeedPost> postList;
@@ -96,6 +97,7 @@ public class FeedFragment extends Fragment {
             result -> {
                 if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                     imageUri = result.getData().getData();
+                    Log.d(TAG, "Gallery image selected: " + imageUri.toString());
                     getCurrentLocation();
                 }
             });
@@ -104,14 +106,12 @@ public class FeedFragment extends Fragment {
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 if (result.getResultCode() == Activity.RESULT_OK) {
-                    // For Android Q and above, we use the saved imageUri
-                    // For older versions, we need to handle the bitmap data
-                    if (imageUri == null && result.getData() != null && result.getData().getExtras() != null) {
-                        // This is the case where we get bitmap data instead of URI
-                        Toast.makeText(getContext(), "Please use gallery for better quality", Toast.LENGTH_SHORT).show();
-                        return;
+                    Log.d(TAG, "Camera photo taken, URI: " + (imageUri != null ? imageUri.toString() : "null"));
+                    if (imageUri != null) {
+                        getCurrentLocation();
+                    } else {
+                        Toast.makeText(getContext(), "Error capturing photo", Toast.LENGTH_SHORT).show();
                     }
-                    getCurrentLocation();
                 }
             });
 
@@ -136,10 +136,10 @@ public class FeedFragment extends Fragment {
             registerForActivityResult(new ActivityResultContracts.RequestPermission(),
                     isGranted -> {
                         if (isGranted) {
-                            // Permission granted, launch camera with proper URI handling
+                            Log.d(TAG, "Camera permission granted");
                             dispatchTakePictureIntent();
                         } else {
-                            Toast.makeText(getContext(), "Camera permission denied", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "Camera permission is required to take photos", Toast.LENGTH_SHORT).show();
                         }
                     });
 
@@ -182,7 +182,9 @@ public class FeedFragment extends Fragment {
         View.OnClickListener addPostClickListener = v -> selectImage();
 
         fabNewPost.setOnClickListener(addPostClickListener);
-        btnAddPhoto.setOnClickListener(addPostClickListener);
+        if (btnAddPhoto != null) {
+            btnAddPhoto.setOnClickListener(addPostClickListener);
+        }
 
         return view;
     }
@@ -232,21 +234,35 @@ public class FeedFragment extends Fragment {
             File photoFile = null;
             try {
                 photoFile = createImageFile();
+                Log.d(TAG, "Created image file: " + photoFile.getAbsolutePath());
             } catch (IOException ex) {
-                // Error occurred while creating the File
+                Log.e(TAG, "Error occurred while creating the File", ex);
                 Toast.makeText(getContext(), "Error creating image file", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             // Continue only if the File was successfully created
             if (photoFile != null) {
-                imageUri = FileProvider.getUriForFile(requireContext(),
-                        requireContext().getPackageName() + ".provider",
-                        photoFile);
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-                takePictureIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                cameraLauncher.launch(takePictureIntent);
+                try {
+                    imageUri = FileProvider.getUriForFile(requireContext(),
+                            requireContext().getPackageName() + ".provider",
+                            photoFile);
+                    Log.d(TAG, "FileProvider URI created: " + imageUri.toString());
+
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                    takePictureIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    takePictureIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+                    cameraLauncher.launch(takePictureIntent);
+                } catch (IllegalArgumentException e) {
+                    Log.e(TAG, "FileProvider error: ", e);
+                    Toast.makeText(getContext(),
+                            "Error setting up camera. Please check app configuration.",
+                            Toast.LENGTH_LONG).show();
+                }
             }
+        } else {
+            Toast.makeText(getContext(), "No camera app found", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -254,15 +270,25 @@ public class FeedFragment extends Fragment {
         // Create an image file name
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         String imageFileName = "JPEG_" + timeStamp + "_";
+
+        // Get the app's external files directory for pictures
         File storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+
+        // Make sure the Pictures directory exists
+        if (storageDir != null && !storageDir.exists()) {
+            boolean created = storageDir.mkdirs();
+            Log.d(TAG, "Pictures directory created: " + created);
+        }
+
         File image = File.createTempFile(
                 imageFileName,  /* prefix */
                 ".jpg",         /* suffix */
                 storageDir      /* directory */
         );
 
-        // Save a file: path for use with ACTION_VIEW intents
+        // Save a file path for use with ACTION_VIEW intents
         currentPhotoPath = image.getAbsolutePath();
+        Log.d(TAG, "Image file path: " + currentPhotoPath);
         return image;
     }
 
@@ -284,12 +310,13 @@ public class FeedFragment extends Fragment {
                     if (location != null) {
                         currentLatitude = location.getLatitude();
                         currentLongitude = location.getLongitude();
-                        // We'll just get coordinates but not the location name
-                        currentLocationName = "Custom Location"; // Default name
+                        currentLocationName = "Custom Location";
+                        Log.d(TAG, "Location obtained: " + currentLatitude + ", " + currentLongitude);
                     }
                     showCreatePostDialog();
                 })
                 .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to get location", e);
                     Toast.makeText(getContext(), "Using default location", Toast.LENGTH_SHORT).show();
                     showCreatePostDialog();
                 });
@@ -304,10 +331,8 @@ public class FeedFragment extends Fragment {
                 // Check camera permission before launching camera
                 if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
                         != PackageManager.PERMISSION_GRANTED) {
-                    // Request camera permission
                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
                 } else {
-                    // Permission already granted, launch camera with proper URI handling
                     dispatchTakePictureIntent();
                 }
             } else if (options[item].equals("Choose from Gallery")) {
@@ -321,7 +346,10 @@ public class FeedFragment extends Fragment {
     }
 
     private void showCreatePostDialog() {
-        if (imageUri == null) return;
+        if (imageUri == null) {
+            Log.e(TAG, "No image URI available for post creation");
+            return;
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         LayoutInflater inflater = requireActivity().getLayoutInflater();
@@ -336,7 +364,15 @@ public class FeedFragment extends Fragment {
         final MaterialButton btnCancel = dialogView.findViewById(R.id.btn_cancel);
         final MaterialButton btnPost = dialogView.findViewById(R.id.btn_post);
 
-        imagePreview.setImageURI(imageUri);
+        // Set image preview
+        try {
+            imagePreview.setImageURI(imageUri);
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading image preview", e);
+            Toast.makeText(getContext(), "Error loading image", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         editLocation.setText(currentLocationName);
 
         // Setup activity type dropdown
@@ -352,7 +388,7 @@ public class FeedFragment extends Fragment {
         // Create the dialog
         AlertDialog dialog = builder.setView(dialogView).create();
 
-        // Set up click listeners for custom buttons
+        // Set up click listeners
         btnClose.setOnClickListener(v -> dialog.dismiss());
 
         btnChangePhoto.setOnClickListener(v -> {
@@ -379,51 +415,76 @@ public class FeedFragment extends Fragment {
     }
 
     private String getFileExtension(Uri uri) {
-        ContentResolver cR = requireContext().getContentResolver();
-        MimeTypeMap mime = MimeTypeMap.getSingleton();
-        return mime.getExtensionFromMimeType(cR.getType(uri));
+        try {
+            ContentResolver cR = requireContext().getContentResolver();
+            MimeTypeMap mime = MimeTypeMap.getSingleton();
+            String extension = mime.getExtensionFromMimeType(cR.getType(uri));
+            return extension != null ? extension : "jpg"; // default to jpg if extension can't be determined
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting file extension", e);
+            return "jpg"; // default fallback
+        }
     }
 
     private void uploadPost(final String location, final String activityType, final String caption) {
         if (imageUri != null) {
-            Toast.makeText(getContext(), "Uploading...", Toast.LENGTH_LONG).show();
+            Toast.makeText(getContext(), "Uploading post...", Toast.LENGTH_SHORT).show();
+
             final StorageReference fileReference = storageReference.child(System.currentTimeMillis()
                     + "." + getFileExtension(imageUri));
 
             fileReference.putFile(imageUri)
-                    .addOnSuccessListener(taskSnapshot -> fileReference.getDownloadUrl().addOnSuccessListener(uri -> {
-                        Toast.makeText(getContext(), "Post Uploaded!", Toast.LENGTH_SHORT).show();
+                    .addOnSuccessListener(taskSnapshot -> {
+                        Log.d(TAG, "Image uploaded successfully");
+                        fileReference.getDownloadUrl().addOnSuccessListener(uri -> {
+                            Log.d(TAG, "Download URL obtained: " + uri.toString());
 
-                        FirebaseUser currentUser = mAuth.getCurrentUser();
-                        if (currentUser != null) {
-                            String userId = currentUser.getUid();
-                            String username = currentUser.getEmail() != null ? currentUser.getEmail().split("@")[0] : "Anonymous";
+                            FirebaseUser currentUser = mAuth.getCurrentUser();
+                            if (currentUser != null) {
+                                String userId = currentUser.getUid();
+                                String username = currentUser.getEmail() != null ?
+                                        currentUser.getEmail().split("@")[0] : "Anonymous";
 
-                            String postId = databaseReference.push().getKey();
-                            long timestamp = System.currentTimeMillis();
+                                String postId = databaseReference.push().getKey();
+                                long timestamp = System.currentTimeMillis();
 
-                            FeedPost newPost = new FeedPost(
-                                    postId,
-                                    userId,
-                                    username,
-                                    location, // Use the manually entered location
-                                    currentLatitude,
-                                    currentLongitude,
-                                    timestamp,
-                                    uri.toString(),
-                                    activityType, // Use the selected activity type
-                                    0, 0,
-                                    caption
-                            );
+                                FeedPost newPost = new FeedPost(
+                                        postId,
+                                        userId,
+                                        username,
+                                        location,
+                                        currentLatitude,
+                                        currentLongitude,
+                                        timestamp,
+                                        uri.toString(),
+                                        activityType,
+                                        0, 0,
+                                        caption
+                                );
 
-                            if (postId != null) {
-                                databaseReference.child(postId).setValue(newPost);
+                                if (postId != null) {
+                                    databaseReference.child(postId).setValue(newPost)
+                                            .addOnSuccessListener(aVoid -> {
+                                                Toast.makeText(getContext(), "Post shared successfully!", Toast.LENGTH_SHORT).show();
+                                                Log.d(TAG, "Post saved to database");
+                                            })
+                                            .addOnFailureListener(e -> {
+                                                Log.e(TAG, "Failed to save post to database", e);
+                                                Toast.makeText(getContext(), "Failed to save post", Toast.LENGTH_SHORT).show();
+                                            });
+                                }
                             }
-                        }
-                    }))
-                    .addOnFailureListener(e -> Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_SHORT).show());
+                        }).addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to get download URL", e);
+                            Toast.makeText(getContext(), "Failed to get image URL", Toast.LENGTH_SHORT).show();
+                        });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Image upload failed", e);
+                        Toast.makeText(getContext(), "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
         } else {
-            Toast.makeText(getContext(), "No file selected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "No image selected", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -447,12 +508,14 @@ public class FeedFragment extends Fragment {
                 }
 
                 adapter.notifyDataSetChanged();
+                Log.d(TAG, "Posts loaded: " + postList.size());
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Database error: " + databaseError.getMessage());
                 showEmptyState();
-                Toast.makeText(getContext(), databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Failed to load posts", Toast.LENGTH_SHORT).show();
             }
         });
     }

@@ -240,16 +240,7 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Adventure Statistics Section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Adventure Stats"
-                android:textColor="@color/white"
-                android:fontFamily="@font/seg_ui_semibold"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="16dp" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"
