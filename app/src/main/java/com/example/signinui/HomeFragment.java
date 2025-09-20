@@ -8,6 +8,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -51,32 +52,41 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-
-
-
 public class HomeFragment extends Fragment {
     private static final String TAG = "HomeFragment";
+
+    // UI Components
     private TextView userNameHero;
     private TextView temperatureText;
     private ImageView weatherIcon;
     private TextView friendCountText;
+    private TextView streakText; // Added for streak display
     private RecyclerView recyclerView;
     private FeaturedRouteAdapter routeAdapter;
     private List<Route> routeList = new ArrayList<>();
+
+    // Firebase
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
     private FusedLocationProviderClient fusedLocationClient;
+
+    // Bluetooth
     private String partnerUid = null;
     private BluetoothService bluetoothService;
     private boolean isServiceBound = false;
@@ -92,10 +102,22 @@ public class HomeFragment extends Fragment {
     private ActivityResultLauncher<Intent> enableBluetoothLauncher;
     private Handler heartbeatHandler = new Handler();
     private Runnable heartbeatRunnable;
+
+    // Streak System
+    private SharedPreferences streakPrefs;
+    private static final String STREAK_PREFS = "streak_preferences";
+    private static final String KEY_CURRENT_STREAK = "current_streak";
+    private static final String KEY_LAST_VISIT_DATE = "last_visit_date";
+    private static final String KEY_LONGEST_STREAK = "longest_streak";
+    private static final String KEY_TOTAL_DAYS_ACTIVE = "total_days_active";
+
+    // API Constants
     private static final String API_KEY = "9bd3c0f117e2da1a013b82af5e348ba8";
     private static final String BASE_URL = "https://api.openweathermap.org/data/2.5/";
     private static final String TRAIL_API_URL = "https://opentrails.wsp.com/api/trails";
     private static final String USFS_API_URL = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RecreationOpportunities_01/MapServer/0/query?where=1%3D1&outFields=*&f=json";
+
+    // Image Arrays
     private static final String[] HIKING_IMAGES = {
             "https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&auto=format&fit=crop",
             "https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=400&auto=format&fit=crop",
@@ -117,6 +139,7 @@ public class HomeFragment extends Fragment {
             "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&auto=format&fit=crop",
             "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&auto=format&fit=crop"
     };
+
     private Random random = new Random();
     private boolean isDiscoveryInProgress = false;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
@@ -126,6 +149,7 @@ public class HomeFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initializeLaunchers();
+        initializeStreakSystem();
     }
 
     @Nullable
@@ -135,11 +159,19 @@ public class HomeFragment extends Fragment {
         initializeFirebase();
         initializeViews(view);
         loadUserData();
+        updateStreakDisplay(); // Update streak when view is created
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         checkLocationPermissionAndFetchData();
         view.findViewById(R.id.find_friends_button).setOnClickListener(v -> checkPermissionsAndStartDiscovery());
         bindBluetoothService();
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Check and update streak every time the fragment resumes
+        checkAndUpdateDailyStreak();
     }
 
     @Override
@@ -153,6 +185,138 @@ public class HomeFragment extends Fragment {
             heartbeatHandler.removeCallbacks(heartbeatRunnable);
         }
     }
+
+    // =============================================================================================
+    // Streak System Implementation
+    // =============================================================================================
+
+    private void initializeStreakSystem() {
+        streakPrefs = requireContext().getSharedPreferences(STREAK_PREFS, Context.MODE_PRIVATE);
+        Log.d(TAG, "Streak system initialized");
+    }
+
+    private void checkAndUpdateDailyStreak() {
+        String today = getTodayDateString();
+        String lastVisitDate = streakPrefs.getString(KEY_LAST_VISIT_DATE, "");
+        int currentStreak = streakPrefs.getInt(KEY_CURRENT_STREAK, 0);
+
+        Log.d(TAG, "Checking streak - Today: " + today + ", Last visit: " + lastVisitDate + ", Current streak: " + currentStreak);
+
+        if (lastVisitDate.isEmpty()) {
+            // First time opening the app
+            startNewStreak(today);
+            showStreakMessage("Welcome! Your adventure streak begins today!", false);
+        } else if (lastVisitDate.equals(today)) {
+            // Already visited today, no change needed
+            Log.d(TAG, "Already visited today, streak remains: " + currentStreak);
+        } else if (isConsecutiveDay(lastVisitDate, today)) {
+            // Visited yesterday, continue streak
+            continueStreak(today, currentStreak);
+            showStreakMessage("Streak continued! " + (currentStreak + 1) + " days strong!", false);
+        } else {
+            // Missed a day, reset streak
+            resetStreak(today);
+            showStreakMessage("Streak reset. Let's start fresh!", true);
+        }
+
+        updateStreakDisplay();
+    }
+
+    private void startNewStreak(String today) {
+        SharedPreferences.Editor editor = streakPrefs.edit();
+        editor.putInt(KEY_CURRENT_STREAK, 1);
+        editor.putString(KEY_LAST_VISIT_DATE, today);
+        editor.putInt(KEY_TOTAL_DAYS_ACTIVE, streakPrefs.getInt(KEY_TOTAL_DAYS_ACTIVE, 0) + 1);
+        editor.apply();
+
+        Log.d(TAG, "Started new streak");
+    }
+
+    private void continueStreak(String today, int currentStreak) {
+        int newStreak = currentStreak + 1;
+        int longestStreak = streakPrefs.getInt(KEY_LONGEST_STREAK, 0);
+
+        SharedPreferences.Editor editor = streakPrefs.edit();
+        editor.putInt(KEY_CURRENT_STREAK, newStreak);
+        editor.putString(KEY_LAST_VISIT_DATE, today);
+        editor.putInt(KEY_TOTAL_DAYS_ACTIVE, streakPrefs.getInt(KEY_TOTAL_DAYS_ACTIVE, 0) + 1);
+
+        // Update longest streak if current streak is higher
+        if (newStreak > longestStreak) {
+            editor.putInt(KEY_LONGEST_STREAK, newStreak);
+            Log.d(TAG, "New longest streak record: " + newStreak);
+        }
+
+        editor.apply();
+
+        Log.d(TAG, "Continued streak to: " + newStreak);
+    }
+
+    private void resetStreak(String today) {
+        SharedPreferences.Editor editor = streakPrefs.edit();
+        editor.putInt(KEY_CURRENT_STREAK, 1);
+        editor.putString(KEY_LAST_VISIT_DATE, today);
+        editor.putInt(KEY_TOTAL_DAYS_ACTIVE, streakPrefs.getInt(KEY_TOTAL_DAYS_ACTIVE, 0) + 1);
+        editor.apply();
+
+        Log.d(TAG, "Reset streak to 1");
+    }
+
+    private void updateStreakDisplay() {
+        if (streakText != null) {
+            int currentStreak = streakPrefs.getInt(KEY_CURRENT_STREAK, 0);
+            streakText.setText(String.valueOf(currentStreak));
+            Log.d(TAG, "Updated streak display: " + currentStreak);
+        }
+    }
+
+    private void showStreakMessage(String message, boolean isReset) {
+        if (getContext() != null) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+
+            // You can add more elaborate streak notifications here
+            // For example, special messages for milestone streaks
+            int currentStreak = streakPrefs.getInt(KEY_CURRENT_STREAK, 0);
+            if (!isReset && (currentStreak == 7 || currentStreak == 30 || currentStreak == 100)) {
+                Toast.makeText(getContext(), "🎉 " + currentStreak + " day milestone! Amazing dedication!", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private String getTodayDateString() {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return dateFormat.format(new Date());
+    }
+
+    private boolean isConsecutiveDay(String lastVisitDate, String today) {
+        try {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            Date lastDate = dateFormat.parse(lastVisitDate);
+            Date todayDate = dateFormat.parse(today);
+
+            if (lastDate != null && todayDate != null) {
+                long diffInMillis = todayDate.getTime() - lastDate.getTime();
+                long diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis);
+                return diffInDays == 1; // Exactly one day difference
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing dates", e);
+        }
+        return false;
+    }
+
+    // Public method to get streak statistics (optional, for debugging or display)
+    public Map<String, Integer> getStreakStats() {
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("current_streak", streakPrefs.getInt(KEY_CURRENT_STREAK, 0));
+        stats.put("longest_streak", streakPrefs.getInt(KEY_LONGEST_STREAK, 0));
+        stats.put("total_days_active", streakPrefs.getInt(KEY_TOTAL_DAYS_ACTIVE, 0));
+        return stats;
+    }
+
+    // =============================================================================================
+    // Existing Methods (unchanged from original)
+    // =============================================================================================
 
     private void bindBluetoothService() {
         Intent intent = new Intent(requireContext(), BluetoothService.class);
@@ -446,6 +610,7 @@ public class HomeFragment extends Fragment {
         temperatureText = view.findViewById(R.id.temperature_text);
         userNameHero = view.findViewById(R.id.user_name_hero);
         friendCountText = view.findViewById(R.id.friend_count_text);
+        streakText = view.findViewById(R.id.stat_streak); // Make sure this ID matches your XML
         recyclerView = view.findViewById(R.id.featured_routes_recycler);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         routeAdapter = new FeaturedRouteAdapter(routeList, requireContext());

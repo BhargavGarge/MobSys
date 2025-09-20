@@ -7,9 +7,11 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.view.View;
-import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -24,6 +26,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +36,14 @@ public class ChatActivity extends AppCompatActivity {
     // UI Components
     private RecyclerView chatRecyclerView;
     private EditText messageInput;
-    private Button sendButton;
+    private ImageButton sendButton;
+    private TextView partnerNameText;
+    private ImageView partnerProfileImage;
+    private TextView onlineStatusText;
 
     // Firebase
     private DatabaseReference messagesDbRef;
+    private DatabaseReference usersDbRef;
     private ChildEventListener mChildEventListener;
     private FirebaseAuth mAuth;
 
@@ -50,12 +57,13 @@ public class ChatActivity extends AppCompatActivity {
     private String currentUserUid;
     private String partnerUid;
     private String chatId;
-
+    private String currentUserName;
+    private String partnerName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_chat); // You need to create this layout file
+        setContentView(R.layout.activity_chat);
 
         // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
@@ -73,11 +81,14 @@ public class ChatActivity extends AppCompatActivity {
         // Generate a consistent, unique chat ID for the two users
         generateChatId();
 
-        // Setup Firebase Database reference
+        // Setup Firebase Database references
         messagesDbRef = FirebaseDatabase.getInstance().getReference().child("chats").child(chatId).child("messages");
+        usersDbRef = FirebaseDatabase.getInstance().getReference().child("users");
 
         // Setup UI
         initializeUI();
+        loadUserNames();
+        loadPartnerInfo();
 
         sendButton.setOnClickListener(v -> {
             String messageText = messageInput.getText().toString().trim();
@@ -101,19 +112,76 @@ public class ChatActivity extends AppCompatActivity {
         chatRecyclerView = findViewById(R.id.chat_recycler_view);
         messageInput = findViewById(R.id.edit_text_chatbox);
         sendButton = findViewById(R.id.button_send);
+        partnerNameText = findViewById(R.id.partner_name);
+        partnerProfileImage = findViewById(R.id.partner_profile_image);
+        onlineStatusText = findViewById(R.id.online_status);
+
+        // Setup back button
+        findViewById(R.id.back_button).setOnClickListener(v -> finish());
 
         // Setup RecyclerView
-        chatRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        messageListAdapter = new ChatAdapter(messages);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setStackFromEnd(true); // Show latest messages at bottom
+        chatRecyclerView.setLayoutManager(layoutManager);
+
+        messageListAdapter = new ChatAdapter(messages, currentUserUid);
         chatRecyclerView.setAdapter(messageListAdapter);
     }
 
+    private void loadUserNames() {
+        // Load current user name
+        usersDbRef.child(currentUserUid).child("name").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                currentUserName = snapshot.getValue(String.class);
+                if (currentUserName == null) currentUserName = "You";
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                currentUserName = "You";
+            }
+        });
+    }
+
+    private void loadPartnerInfo() {
+        // Load partner's information
+        usersDbRef.child(partnerUid).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                partnerName = snapshot.child("name").getValue(String.class);
+                String profileImageUrl = snapshot.child("profileImageUrl").getValue(String.class);
+
+                if (partnerName != null) {
+                    partnerNameText.setText(partnerName);
+                } else {
+                    partnerNameText.setText("Adventure Buddy");
+                }
+
+                // Set online status (you can implement real-time presence later)
+                onlineStatusText.setText("Online now");
+                onlineStatusText.setVisibility(View.VISIBLE);
+
+                // Load profile image if available (you'll need to implement image loading)
+                // For now, set a default avatar
+                partnerProfileImage.setImageResource(R.drawable.ic_person);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                partnerNameText.setText("Adventure Buddy");
+                partnerProfileImage.setImageResource(R.drawable.ic_person);
+            }
+        });
+    }
+
     private void sendMessage(String messageText) {
-        // Create the message object
+        // Create the message object with additional info
         ChatMessage chatMessage = new ChatMessage(
                 currentUserUid,
                 messageText,
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                currentUserName != null ? currentUserName : "You"
         );
 
         // 1. Push the message to Firebase Realtime Database
@@ -132,13 +200,22 @@ public class ChatActivity extends AppCompatActivity {
                 public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
                     // A new message has been added to the database
                     ChatMessage chatMessage = snapshot.getValue(ChatMessage.class);
+                    if (chatMessage != null) {
+                        // Set sender name if not available
+                        if (chatMessage.getSenderName() == null) {
+                            if (chatMessage.getSenderId().equals(currentUserUid)) {
+                                chatMessage.setSenderName(currentUserName != null ? currentUserName : "You");
+                            } else {
+                                chatMessage.setSenderName(partnerName != null ? partnerName : "Adventure Buddy");
+                            }
+                        }
 
-                    // Add the message to the adapter and scroll to the bottom
-                    messageListAdapter.add(chatMessage);
-                    chatRecyclerView.scrollToPosition(messageListAdapter.getItemCount() - 1);
+                        // Add the message to the adapter and scroll to the bottom
+                        messageListAdapter.add(chatMessage);
+                        chatRecyclerView.scrollToPosition(messageListAdapter.getItemCount() - 1);
+                    }
                 }
 
-                // Other methods are not needed for this simple chat but must be implemented
                 @Override
                 public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
                 @Override
@@ -197,7 +274,5 @@ public class ChatActivity extends AppCompatActivity {
         }
         // Stop listening to prevent memory leaks and unnecessary background activity
         detachDatabaseReadListener();
-        messages.clear(); // Clear messages when activity is not visible
-        messageListAdapter.notifyDataSetChanged();
     }
 }

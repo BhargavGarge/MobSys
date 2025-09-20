@@ -4,12 +4,15 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.signinui.model.ChatMessage;
-import com.google.firebase.auth.FirebaseAuth;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHolder> {
 
@@ -20,9 +23,9 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
     private static final int VIEW_TYPE_SENT = 1;
     private static final int VIEW_TYPE_RECEIVED = 2;
 
-    public ChatAdapter(List<ChatMessage> messageList) {
+    public ChatAdapter(List<ChatMessage> messageList, String currentUserUid) {
         this.messageList = messageList;
-        this.currentUserUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        this.currentUserUid = currentUserUid;
     }
 
     @Override
@@ -53,7 +56,29 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
     @Override
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
         ChatMessage message = messageList.get(position);
+
+        // Set message text
         holder.messageText.setText(message.getMessageText());
+
+        // Set sender name (only for received messages)
+        if (holder.senderName != null) {
+            String senderName = message.getSenderName();
+            if (senderName == null || senderName.isEmpty()) {
+                senderName = "Adventure Buddy";
+            }
+            holder.senderName.setText(senderName);
+        }
+
+        // Set timestamp
+        if (holder.timestampText != null) {
+            String timestamp = formatTimestamp(message.getTimestamp());
+            holder.timestampText.setText(timestamp);
+        }
+
+        // Set profile image (default avatar for now)
+        if (holder.profileImage != null) {
+            holder.profileImage.setImageResource(R.drawable.ic_person);
+        }
     }
 
     @Override
@@ -67,14 +92,30 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MessageViewHol
         notifyItemInserted(messageList.size() - 1);
     }
 
+    // Format timestamp to readable format
+    private String formatTimestamp(long timestamp) {
+        try {
+            Date date = new Date(timestamp);
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            return sdf.format(date);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     // ViewHolder class to hold the view for each message item
     static class MessageViewHolder extends RecyclerView.ViewHolder {
         TextView messageText;
+        TextView senderName;
+        TextView timestampText;
+        ImageView profileImage;
 
         public MessageViewHolder(@NonNull View itemView) {
             super(itemView);
-            // This assumes both your sent and received layouts have a TextView with this ID
             messageText = itemView.findViewById(R.id.text_view_message);
+            senderName = itemView.findViewById(R.id.sender_name); // May be null for sent messages
+            timestampText = itemView.findViewById(R.id.timestamp);
+            profileImage = itemView.findViewById(R.id.profile_image); // May be null for sent messages
         }
     }
 }

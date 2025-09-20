@@ -12,16 +12,19 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -43,6 +46,7 @@ public class BluetoothService extends Service {
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothDiscoveryListener discoveryListener;
     private BroadcastReceiver discoveryReceiver;
+    private BroadcastReceiver pairingReceiver;
 
     // Threads for managing Bluetooth connections
     private AcceptThread acceptThread;
@@ -62,6 +66,12 @@ public class BluetoothService extends Service {
         super.onCreate();
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         initializeDiscoveryReceiver();
+        initializePairingReceiver();
+
+        // Register pairing receiver
+        IntentFilter pairingFilter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        registerReceiver(pairingReceiver, pairingFilter);
+
         Log.d(TAG, "BluetoothService created");
     }
 
@@ -74,6 +84,14 @@ public class BluetoothService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopServer(); // Clean up everything when the service is destroyed
+
+        // Unregister pairing receiver
+        try {
+            unregisterReceiver(pairingReceiver);
+        } catch (IllegalArgumentException e) {
+            // Receiver was not registered
+        }
+
         Log.d(TAG, "BluetoothService destroyed");
     }
 
@@ -218,21 +236,57 @@ public class BluetoothService extends Service {
             return;
         }
 
+        // Log detailed device information
+        logDeviceInfo(device);
+
         String deviceName = device.getName() != null ? device.getName() : "Unknown Device";
         Log.d(TAG, "Preparing to connect to device: " + deviceName + " (" + device.getAddress() + ")");
 
+        // Check if device is paired first
+        if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
+            Log.w(TAG, "Device is not paired. Current bond state: " + getBondStateString(device.getBondState()));
+
+            // Show message to user about pairing
+            handler.post(() -> {
+                if (discoveryListener != null) {
+                    Toast.makeText(BluetoothService.this,
+                            "Device must be paired first. Please pair in Bluetooth settings and try again.",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+
+            // Optionally attempt to trigger pairing
+            try {
+                Log.d(TAG, "Attempting to create bond...");
+                boolean result = device.createBond();
+                Log.d(TAG, "createBond() result: " + result);
+                if (!result) {
+                    notifyError("Failed to initiate pairing. Please pair manually in Bluetooth settings.");
+                    return;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Exception during createBond()", e);
+                notifyError("Failed to pair with device. Please try pairing manually in Bluetooth settings.");
+                return;
+            }
+            return; // Don't proceed with connection until paired
+        }
+
         // Cancel any thread attempting to make a connection
         if (connectThread != null) {
+            Log.d(TAG, "Cancelling existing connect thread");
             connectThread.cancel();
             connectThread = null;
         }
 
         // Cancel any thread currently running a connection
         if (connectedThread != null) {
+            Log.d(TAG, "Cancelling existing connected thread");
             connectedThread.cancel();
             connectedThread = null;
         }
 
+        Log.d(TAG, "Starting new connection thread");
         // Start the thread to connect with the given device
         connectThread = new ConnectThread(device);
         connectThread.start();
@@ -291,7 +345,6 @@ public class BluetoothService extends Service {
         startServer();
     }
 
-
     // =============================================================================================
     // Data Transmission Methods
     // =============================================================================================
@@ -348,6 +401,75 @@ public class BluetoothService extends Service {
     // =============================================================================================
     // Private Helper Methods & Receivers
     // =============================================================================================
+
+    private void logDeviceInfo(BluetoothDevice device) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "=== Device Information ===");
+            Log.d(TAG, "Name: " + device.getName());
+            Log.d(TAG, "Address: " + device.getAddress());
+            Log.d(TAG, "Type: " + device.getType());
+            Log.d(TAG, "Bond State: " + getBondStateString(device.getBondState()));
+            Log.d(TAG, "Class: " + device.getBluetoothClass());
+
+            // Get UUIDs if available
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+                android.os.ParcelUuid[] uuids = device.getUuids();
+                if (uuids != null) {
+                    Log.d(TAG, "Available UUIDs:");
+                    for (android.os.ParcelUuid uuid : uuids) {
+                        Log.d(TAG, "  - " + uuid.toString());
+                    }
+                } else {
+                    Log.d(TAG, "No UUIDs available - this might cause connection issues");
+                }
+            }
+            Log.d(TAG, "=========================");
+        }
+    }
+
+    private String getBondStateString(int bondState) {
+        switch (bondState) {
+            case BluetoothDevice.BOND_NONE: return "BOND_NONE";
+            case BluetoothDevice.BOND_BONDING: return "BOND_BONDING";
+            case BluetoothDevice.BOND_BONDED: return "BOND_BONDED";
+            default: return "UNKNOWN";
+        }
+    }
+
+    private void initializePairingReceiver() {
+        pairingReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
+                    int previousBondState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, BluetoothDevice.BOND_NONE);
+
+                    if (device != null) {
+                        Log.d(TAG, "Bond state changed for " + device.getAddress() +
+                                " from " + previousBondState + " to " + bondState);
+
+                        if (bondState == BluetoothDevice.BOND_BONDED) {
+                            Log.d(TAG, "Device paired successfully. You can now connect.");
+                            handler.post(() -> {
+                                if (discoveryListener != null) {
+                                    Toast.makeText(BluetoothService.this, "Device paired! Tap to connect.", Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                        } else if (bondState == BluetoothDevice.BOND_NONE && previousBondState == BluetoothDevice.BOND_BONDING) {
+                            Log.d(TAG, "Pairing failed");
+                            handler.post(() -> {
+                                if (discoveryListener != null) {
+                                    notifyError("Pairing failed. Please try again.");
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        };
+    }
 
     private void initializeDiscoveryReceiver() {
         discoveryReceiver = new BroadcastReceiver() {
@@ -445,7 +567,6 @@ public class BluetoothService extends Service {
             serverSocket = tmp;
         }
 
-
         public void run() {
             if (serverSocket == null) {
                 Log.e(TAG, "Server socket is null, cannot accept connections.");
@@ -487,7 +608,7 @@ public class BluetoothService extends Service {
      * succeeds or fails.
      */
     private class ConnectThread extends Thread {
-        private final BluetoothSocket socket;
+        private BluetoothSocket socket;
         private final BluetoothDevice device;
 
         public ConnectThread(BluetoothDevice device) {
@@ -500,13 +621,22 @@ public class BluetoothService extends Service {
                     Log.e(TAG, "BLUETOOTH_CONNECT permission not granted for ConnectThread.");
                     tmp = null;
                 } else {
-                    // Prioritize createInsecureRfcommSocketToServiceRecord
+                    // Try insecure connection first (most compatible)
                     tmp = device.createInsecureRfcommSocketToServiceRecord(MY_UUID);
                     Log.d(TAG, "Created insecure client socket.");
                 }
             } catch (IOException e) {
-                Log.e(TAG, "Insecure socket creation failed", e);
-                tmp = null;
+                Log.e(TAG, "Insecure socket creation failed, trying secure", e);
+                try {
+                    if (ActivityCompat.checkSelfPermission(BluetoothService.this, Manifest.permission.BLUETOOTH_CONNECT)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        tmp = device.createRfcommSocketToServiceRecord(MY_UUID);
+                        Log.d(TAG, "Created secure client socket as fallback.");
+                    }
+                } catch (IOException e2) {
+                    Log.e(TAG, "Secure socket creation also failed", e2);
+                    tmp = null;
+                }
             }
             socket = tmp;
         }
@@ -521,30 +651,59 @@ public class BluetoothService extends Service {
             // Always cancel discovery because it will slow down a connection
             stopDiscovery();
 
+            // First attempt with the created socket
+            if (attemptConnection(socket)) {
+                return; // Success
+            }
+
+            // If first attempt failed, try reflection method as fallback
+            Log.d(TAG, "Standard connection failed, trying reflection method");
+            BluetoothSocket fallbackSocket = createFallbackSocket();
+            if (fallbackSocket != null && attemptConnection(fallbackSocket)) {
+                socket = fallbackSocket; // Update socket reference
+                return; // Success
+            }
+
+            // All connection attempts failed
+            connectionFailed();
+        }
+
+        private boolean attemptConnection(BluetoothSocket socketToTry) {
             try {
-                // This is a blocking call and will only return on a successful connection or an exception
-                Log.d(TAG, "Attempting to connect to device...");
-                socket.connect();
+                Log.d(TAG, "Attempting to connect...");
+                socketToTry.connect();
                 Log.d(TAG, "Connection successful!");
 
-            } catch (IOException connectException) {
-                Log.e(TAG, "Connection failed", connectException);
-                try {
-                    socket.close();
-                } catch (IOException closeException) {
-                    Log.e(TAG, "Could not close the client socket", closeException);
+                // Reset the ConnectThread because we're done
+                synchronized (BluetoothService.this) {
+                    connectThread = null;
                 }
-                connectionFailed();
-                return;
-            }
 
-            // Reset the ConnectThread because we're done
-            synchronized (BluetoothService.this) {
-                connectThread = null;
+                // Start the connected thread
+                manageConnectedSocket(socketToTry, device);
+                return true;
+            } catch (IOException connectException) {
+                Log.e(TAG, "Connection attempt failed: " + connectException.getMessage());
+                try {
+                    socketToTry.close();
+                } catch (IOException closeException) {
+                    Log.e(TAG, "Could not close the socket", closeException);
+                }
+                return false;
             }
+        }
 
-            // Start the connected thread
-            manageConnectedSocket(socket, device);
+        private BluetoothSocket createFallbackSocket() {
+            try {
+                // Use reflection to create socket on channel 1 (common for SPP)
+                Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+                BluetoothSocket fallbackSocket = (BluetoothSocket) method.invoke(device, 1);
+                Log.d(TAG, "Created fallback socket using reflection");
+                return fallbackSocket;
+            } catch (Exception e) {
+                Log.e(TAG, "Reflection socket creation failed", e);
+                return null;
+            }
         }
 
         public void cancel() {
