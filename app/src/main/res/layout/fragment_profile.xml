@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/gradient_header">
 
-    <!-- Updated top section to use gradient background instead of solid color -->
+    <!-- Top Section -->
     <RelativeLayout
         android:id="@+id/top_section"
         android:layout_width="match_parent"
@@ -20,7 +20,7 @@
             android:layout_marginLeft="22dp"
             android:layout_marginTop="25dp"
             android:src="@drawable/ic_back"
-            android:contentDescription="Back button"/>
+            android:contentDescription="Back button" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -37,7 +37,7 @@
                 android:text="My Profile"
                 android:textColor="@color/white"
                 android:textSize="36sp"
-                android:fontFamily="@font/segoe_ui_bold"/>
+                android:fontFamily="@font/segoe_ui_bold" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -46,11 +46,11 @@
                 android:text="Manage your account settings"
                 android:textColor="@color/white"
                 android:textSize="18sp"
-                android:fontFamily="@font/seg_ui_semibold"/>
+                android:fontFamily="@font/seg_ui_semibold" />
         </LinearLayout>
     </RelativeLayout>
 
-    <!-- White Bottom Section (Scrollable) -->
+    <!-- Scrollable Bottom Section -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -86,7 +86,7 @@
                         android:src="@drawable/ic_person"
                         app:shapeAppearanceOverlay="@style/circleImageView"
                         app:strokeColor="#E0E0E0"
-                        app:strokeWidth="2dp"/>
+                        app:strokeWidth="2dp" />
 
                     <ImageView
                         android:id="@+id/camera_icon"
@@ -97,7 +97,7 @@
                         android:background="@drawable/circle_background"
                         android:padding="4dp"
                         android:src="@drawable/ic_camera"
-                        app:tint="@android:color/white"/>
+                        app:tint="@android:color/white" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -111,21 +111,21 @@
                             android:id="@+id/user_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Bhargav Garge"
+                            android:text="Loading"
                             android:fontFamily="@font/segoe_ui_bold"
                             android:textColor="#2C2C2C"
                             android:textSize="18sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/user_email"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="bhargav@email.com"
+                            android:text="loadingmail"
                             android:fontFamily="@font/segoe_ui_regular"
                             android:textColor="#666666"
-                            android:textSize="14sp"/>
+                            android:textSize="14sp" />
 
                         <!-- Statistics Row -->
                         <LinearLayout
@@ -135,7 +135,6 @@
                             android:orientation="horizontal"
                             android:weightSum="3">
 
-                            <!-- Steps Today -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -150,7 +149,7 @@
                                     android:fontFamily="@font/segoe_ui_regular"
                                     android:textColor="#4CAF50"
                                     android:textSize="14sp"
-                                    android:textStyle="bold"/>
+                                    android:textStyle="bold" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
@@ -158,10 +157,9 @@
                                     android:text="Today"
                                     android:fontFamily="@font/segoe_ui_regular"
                                     android:textColor="#999999"
-                                    android:textSize="12sp"/>
+                                    android:textSize="12sp" />
                             </LinearLayout>
 
-                            <!-- Total Steps -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -176,7 +174,7 @@
                                     android:fontFamily="@font/segoe_ui_regular"
                                     android:textColor="#2196F3"
                                     android:textSize="14sp"
-                                    android:textStyle="bold"/>
+                                    android:textStyle="bold" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
@@ -184,10 +182,9 @@
                                     android:text="Total"
                                     android:fontFamily="@font/segoe_ui_regular"
                                     android:textColor="#999999"
-                                    android:textSize="12sp"/>
+                                    android:textSize="12sp" />
                             </LinearLayout>
 
-                            <!-- Days Active -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -202,7 +199,7 @@
                                     android:fontFamily="@font/segoe_ui_regular"
                                     android:textColor="#FF9800"
                                     android:textSize="14sp"
-                                    android:textStyle="bold"/>
+                                    android:textStyle="bold" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
@@ -210,7 +207,7 @@
                                     android:text="Days Active"
                                     android:fontFamily="@font/segoe_ui_regular"
                                     android:textColor="#999999"
-                                    android:textSize="12sp"/>
+                                    android:textSize="12sp" />
                             </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
@@ -223,11 +220,11 @@
                         android:layout_centerVertical="true"
                         android:background="@drawable/circle_background_light"
                         android:src="@drawable/ic_edit"
-                        app:tint="#666666"/>
+                        app:tint="#666666" />
                 </RelativeLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Step Progress Section -->
+            <!-- Step Progress Section with CustomView -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -240,9 +237,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:gravity="center_horizontal">
 
-                    <!-- Progress Header -->
+                    <!-- Header -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -257,7 +255,7 @@
                             android:fontFamily="@font/segoe_ui_bold"
                             android:textColor="#2C2C2C"
                             android:textSize="16sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/level_text"
@@ -267,86 +265,49 @@
                             android:fontFamily="@font/segoe_ui_regular"
                             android:textColor="#4CAF50"
                             android:textSize="14sp"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- Progress Bar -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <!-- Custom Circular Progress -->
+                    <com.example.signinui.StepProgressView
+                        android:id="@+id/custom_step_progress"
+                        android:layout_width="180dp"
+                        android:layout_height="180dp"
+                        app:progressColor="#4CAF50"
+                        app:backgroundColor="#E0E0E0"
+                        app:textColor="#2C2C2C"
+                        app:strokeWidth="20dp"
+                        android:layout_marginTop="16dp" />
+
+                    <!-- Extra Stats -->
+                    <TextView
+                        android:id="@+id/current_steps"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginTop="12dp">
+                        android:layout_marginTop="8dp"
+                        android:text="12,345"
+                        android:textSize="16sp"
+                        android:textColor="#2C2C2C"
+                        android:fontFamily="@font/segoe_ui_regular" />
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
+                    <TextView
+                        android:id="@+id/target_steps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="15,000"
+                        android:textSize="14sp"
+                        android:textColor="#666666"
+                        android:fontFamily="@font/segoe_ui_regular" />
 
-                            <TextView
-                                android:id="@+id/current_steps"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="12,345"
-                                android:fontFamily="@font/segoe_ui_regular"
-                                android:textColor="#2C2C2C"
-                                android:textSize="14sp"/>
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:gravity="center"
-                                android:text="Steps"
-                                android:fontFamily="@font/segoe_ui_regular"
-                                android:textColor="#666666"
-                                android:textSize="12sp"/>
-
-                            <TextView
-                                android:id="@+id/target_steps"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="15,000"
-                                android:fontFamily="@font/segoe_ui_regular"
-                                android:textColor="#2C2C2C"
-                                android:textSize="14sp"/>
-                        </LinearLayout>
-
-                        <ProgressBar
-                            android:id="@+id/step_progress_bar"
-                            style="?android:attr/progressBarStyleHorizontal"
-                            android:layout_width="match_parent"
-                            android:layout_height="12dp"
-                            android:layout_marginTop="8dp"
-                            android:progress="75"
-                            android:progressDrawable="@drawable/progress_bar_horizontal"/>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_marginTop="8dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="Next level in:"
-                                android:fontFamily="@font/segoe_ui_regular"
-                                android:textColor="#666666"
-                                android:textSize="12sp"/>
-
-                            <TextView
-                                android:id="@+id/steps_to_next_level"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="2,655 steps"
-                                android:fontFamily="@font/segoe_ui_regular"
-                                android:textColor="#4CAF50"
-                                android:textSize="12sp"
-                                android:textStyle="bold"/>
-                        </LinearLayout>
-                    </LinearLayout>
+                    <TextView
+                        android:id="@+id/steps_to_next_level"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="2,655 steps to next level"
+                        android:textSize="12sp"
+                        android:textColor="#4CAF50"
+                        android:fontFamily="@font/segoe_ui_regular" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -373,7 +334,7 @@
                         android:fontFamily="@font/segoe_ui_regular"
                         android:textColor="#666666"
                         android:textSize="12sp"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold" />
 
                     <!-- Personal Info -->
                     <LinearLayout
@@ -389,7 +350,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:src="@drawable/ic_person"
-                            app:tint="#666666"/>
+                            app:tint="#666666" />
 
                         <TextView
                             android:layout_width="0dp"
@@ -399,13 +360,13 @@
                             android:text="Personal Information"
                             android:fontFamily="@font/seg_ui_semibold"
                             android:textColor="#2C2C2C"
-                            android:textSize="16sp"/>
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_right"
-                            app:tint="#CCCCCC"/>
+                            app:tint="#CCCCCC" />
                     </LinearLayout>
 
                     <!-- Divider -->
@@ -413,9 +374,9 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="56dp"
-                        android:background="#EEEEEE"/>
+                        android:background="#EEEEEE" />
 
-                    <!-- Notifications -->
+                    <!-- My Routes -->
                     <LinearLayout
                         android:id="@+id/notifications_item"
                         android:layout_width="match_parent"
@@ -429,24 +390,24 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:src="@drawable/ic_route"
-                            app:tint="#666666"/>
+                            app:tint="#666666" />
 
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="16dp"
                             android:layout_weight="1"
-                            android:text="My Routes "
+                            android:text="My Routes"
                             android:fontFamily="@font/seg_ui_semibold"
                             android:textColor="#2C2C2C"
-                            android:textSize="16sp"/>
+                            android:textSize="16sp" />
+
                         <ImageView
                             android:id="@+id/my_routes_icon"
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_right"
-                            app:tint="#CCCCCC"/>
-
+                            app:tint="#CCCCCC" />
                     </LinearLayout>
 
                     <!-- App Settings Header -->
@@ -459,10 +420,7 @@
                         android:fontFamily="@font/seg_ui_semibold"
                         android:textColor="#666666"
                         android:textSize="12sp"
-                        android:textStyle="bold"/>
-
-                    <!-- Dark Mode -->
-
+                        android:textStyle="bold" />
 
                     <!-- Support Header -->
                     <TextView
@@ -470,11 +428,11 @@
                         android:layout_height="wrap_content"
                         android:background="#F8F9FA"
                         android:padding="12dp"
-                        android:fontFamily="@font/seg_ui_semibold"
                         android:text="Support"
+                        android:fontFamily="@font/seg_ui_semibold"
                         android:textColor="#666666"
                         android:textSize="12sp"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold" />
 
                     <!-- Help -->
                     <LinearLayout
@@ -490,7 +448,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:src="@drawable/ic_help"
-                            app:tint="#666666"/>
+                            app:tint="#666666" />
 
                         <TextView
                             android:layout_width="0dp"
@@ -500,13 +458,13 @@
                             android:text="Help Center"
                             android:fontFamily="@font/seg_ui_semibold"
                             android:textColor="#2C2C2C"
-                            android:textSize="16sp"/>
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_right"
-                            app:tint="#CCCCCC"/>
+                            app:tint="#CCCCCC" />
                     </LinearLayout>
 
                     <!-- Divider -->
@@ -514,7 +472,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="56dp"
-                        android:background="#EEEEEE"/>
+                        android:background="#EEEEEE" />
 
                     <!-- Logout -->
                     <LinearLayout
@@ -530,7 +488,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:src="@drawable/ic_logout"
-                            app:tint="#F44336"/>
+                            app:tint="#F44336" />
 
                         <TextView
                             android:layout_width="0dp"
@@ -540,13 +498,13 @@
                             android:text="Logout"
                             android:fontFamily="@font/seg_ui_semibold"
                             android:textColor="#F44336"
-                            android:textSize="16sp"/>
+                            android:textSize="16sp" />
 
                         <ImageView
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_right"
-                            app:tint="#F44336"/>
+                            app:tint="#F44336" />
                     </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -561,7 +519,7 @@
                 android:text="Version 1.0.0"
                 android:fontFamily="@font/seg_ui_semibold"
                 android:textColor="#CCCCCC"
-                android:textSize="12sp"/>
+                android:textSize="12sp" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </RelativeLayout>

@@ -30,7 +30,7 @@
     <!-- Text Colors -->
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
-
+    <color name="adventure_primary">#4CAF50</color>
     <!-- Interaction Colors -->
     <color name="adventure_ripple">#40FFFFFF</color>
     <color name="accent_teal">#006D5B</color>

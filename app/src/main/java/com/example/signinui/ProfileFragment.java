@@ -54,7 +54,7 @@ public class ProfileFragment extends Fragment {
     private static final int REQUEST_IMAGE_PICK = 2;
 
     // Views
-    private ProgressBar stepProgressBar;
+    private StepProgressView customStepProgressView;
     private TextView currentStepsText, targetStepsText, stepsToNextLevelText, levelText;
     private TextView stepsTodayText, totalStepsText, daysActiveText, userName, userEmail;
     private LinearLayout myRoutesLayout, logoutLayout, helpLayout, personalInfoLayout;
@@ -86,7 +86,7 @@ public class ProfileFragment extends Fragment {
         }
 
         // Initialize views
-        stepProgressBar = view.findViewById(R.id.step_progress_bar);
+        customStepProgressView = view.findViewById(R.id.custom_step_progress);
         currentStepsText = view.findViewById(R.id.current_steps);
         targetStepsText = view.findViewById(R.id.target_steps);
         stepsToNextLevelText = view.findViewById(R.id.steps_to_next_level);
@@ -465,15 +465,18 @@ public class ProfileFragment extends Fragment {
 
             NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.US);
 
+            // Update UI
             levelText.setText("Level " + currentLevel);
             currentStepsText.setText(numberFormat.format(totalSteps));
             targetStepsText.setText(numberFormat.format(nextLevelThreshold));
             stepsToNextLevelText.setText(numberFormat.format(stepsRemaining) + " steps");
 
-            stepProgressBar.setProgress(Math.min(100, progress));
+            // ✅ Update Custom Circular ProgressView
+            if (customStepProgressView != null) {
+                customStepProgressView.setProgress(Math.min(100, progress));
+            }
 
             totalStepsText.setText(numberFormat.format(totalSteps));
-
             stepsTodayText.setText(numberFormat.format(calculateStepsToday(totalSteps)));
             daysActiveText.setText(String.valueOf(calculateDaysActive(totalSteps)));
         }

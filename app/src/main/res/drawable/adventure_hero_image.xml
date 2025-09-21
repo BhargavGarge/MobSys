@@ -1,0 +1,41 @@
+<!-- adventure_hero_image.xml -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="280dp"
+    android:height="280dp"
+    android:viewportWidth="280"
+    android:viewportHeight="280">
+
+    <!-- Background Circle -->
+    <path
+        android:fillColor="#A8E6CF"
+        android:pathData="M140,140m-140,0a140,140 0,1 1,280 0a140,140 0,1 1,-280 0" />
+
+    <!-- Mountains -->
+    <path
+        android:fillColor="#2D5A27"
+        android:pathData="M60,180 L100,120 L140,160 L180,100 L220,140 L220,220 L60,220 Z" />
+
+    <!-- Trees -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M80,200 L90,170 L100,200 Z" />
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M160,210 L170,180 L180,210 Z" />
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M200,205 L210,175 L220,205 Z" />
+
+    <!-- Trail Path -->
+    <path
+        android:strokeColor="#81C784"
+        android:strokeWidth="4"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M40,220 Q80,200 120,210 Q160,220 200,200 Q220,190 240,200" />
+
+    <!-- Hiker Silhouette -->
+    <path
+        android:fillColor="#1B5E20"
+        android:pathData="M140,140 C142,138 144,140 144,142 C144,144 142,146 140,146 C138,146 136,144 136,142 C136,140 138,138 140,140 Z M138,150 L142,150 L144,170 L142,170 L142,180 L138,180 L138,170 L136,170 Z" />
+
+</vector>

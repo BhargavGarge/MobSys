@@ -1,78 +1,359 @@
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#d7d6d7"
+    android:background="@drawable/intro_gradient_background"
     tools:context=".MainActivity">
 
-    <!-- Top Image -->
+    <!-- Background Pattern Overlay -->
     <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:srcCompat="@drawable/girl"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="40dp"
-        android:layout_marginStart="20dp" />
-
-    <!-- Bottom White Background -->
-    <ImageView
-        android:id="@+id/imageView2"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:id="@+id/background_pattern"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.1"
         android:scaleType="centerCrop"
-        app:srcCompat="@drawable/bottom_white"
+        android:src="@drawable/topographic_pattern"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Title -->
-
-    <!-- Subtitle -->
-    <TextView
-        android:id="@+id/textView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="12dp"
-        android:text="Welcome to App!"
-        android:fontFamily="@font/segoe_ui_bold"
-        android:textColor="#000000"
-        android:textSize="35sp"
-        android:textStyle="bold"
+    <!-- Top Decorative Elements -->
+    <ImageView
+        android:id="@+id/mountain_silhouette"
+        android:layout_width="0dp"
+        android:layout_height="120dp"
+        android:alpha="0.3"
+        android:scaleType="fitXY"
+        android:src="@drawable/mountain_silhouette"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/imageView" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:tint="#2D5A27" />
 
-    <TextView
-        android:id="@+id/textView2"
-        android:layout_width="wrap_content"
+    <!-- Main Hero Image -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/hero_image_card"
+        android:layout_width="280dp"
+        android:layout_height="280dp"
+        android:layout_marginTop="60dp"
+        app:cardCornerRadius="140dp"
+        app:cardElevation="12dp"
+        app:cardBackgroundColor="@android:color/transparent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:id="@+id/hero_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/adventure_hero_image" />
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Floating Adventure Icons -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/hiking_icon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginStart="40dp"
+        android:layout_marginTop="100dp"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="8dp"
+        app:cardBackgroundColor="#4CAF50"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/hero_image_card">
+
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_hiking"
+            app:tint="@android:color/white" />
+
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cycling_icon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="60dp"
+        android:layout_marginTop="80dp"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="6dp"
+        app:cardBackgroundColor="#66BB6A"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/hero_image_card">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_cycling"
+            app:tint="@android:color/white" />
+
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/running_icon"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginStart="80dp"
+        android:layout_marginBottom="120dp"
+        app:cardCornerRadius="22dp"
+        app:cardElevation="4dp"
+        app:cardBackgroundColor="#81C784"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/content_card">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_running"
+            app:tint="@android:color/white" />
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Main Content Card -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/content_card"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Let’s Make Things Happen"
-        android:fontFamily="@font/segoe_ui_regular"
-        android:textSize="20sp"
-        android:textColor="#8b8b8b"
-        app:layout_constraintStart_toStartOf="@id/textView"
-        app:layout_constraintTop_toBottomOf="@id/textView"
-        android:layout_marginTop="8dp" />
-
-    <!-- Get Started Button -->
-    <TextView
-        android:id="@+id/button2"
-        android:layout_width="175dp"
-        android:layout_height="65dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
         android:layout_marginBottom="40dp"
-        android:background="@drawable/button_background"
-        android:gravity="center"
-        android:text="Get Started"
-        android:fontFamily="@font/seg_ui_semibold"
-        android:textColor="#ffffff"
-        android:textSize="25sp"
-        android:textStyle="bold"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="16dp"
+        app:cardBackgroundColor="@android:color/white"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="32dp">
+
+            <!-- App Logo/Icon -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="20dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#4CAF50">
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_adventure_logo"
+                    app:tint="@android:color/white" />
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Welcome Title -->
+            <TextView
+                android:id="@+id/welcome_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="8dp"
+                android:text="Welcome to AdventureApp"
+                android:fontFamily="@font/segoe_ui_bold"
+                android:textColor="#1B5E20"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <!-- Subtitle -->
+            <TextView
+                android:id="@+id/welcome_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="24dp"
+                android:text="Discover amazing trails and connect\nwith fellow adventurers"
+                android:fontFamily="@font/segoe_ui_regular"
+                android:textSize="16sp"
+                android:textColor="#4A5568"
+                android:gravity="center"
+                android:lineSpacingExtra="4dp" />
+
+            <!-- Features List -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="32dp">
+
+                <!-- Feature 1 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="#E8F5E8">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_explore"
+                            app:tint="#4CAF50" />
+
+                    </androidx.cardview.widget.CardView>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="16dp"
+                        android:text="Explore thousands of trails"
+                        android:textColor="#2D3748"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/segoe_ui_regular" />
+
+                </LinearLayout>
+
+                <!-- Feature 2 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="#E8F5E8">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_friends"
+                            app:tint="#4CAF50" />
+
+                    </androidx.cardview.widget.CardView>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="16dp"
+                        android:text="Connect with adventure buddies"
+                        android:textColor="#2D3748"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/segoe_ui_regular" />
+
+                </LinearLayout>
+
+                <!-- Feature 3 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="#E8F5E8">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_record"
+                            app:tint="#4CAF50" />
+
+                    </androidx.cardview.widget.CardView>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="16dp"
+                        android:text="Track your adventures"
+                        android:textColor="#2D3748"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/segoe_ui_regular" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Get Started Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/get_started_button"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Start Your Adventure"
+                android:textColor="@android:color/white"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/segoe_ui_bold"
+                app:backgroundTint="#4CAF50"
+                app:cornerRadius="16dp"
+                app:elevation="8dp"
+                app:icon="@drawable/ic_arrow_forward"
+                app:iconGravity="textEnd"
+                app:iconTint="@android:color/white" />
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Floating Particles/Dots for Visual Interest -->
+    <View
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginTop="200dp"
+        android:layout_marginEnd="40dp"
+        android:background="@drawable/floating_dot"
+        android:alpha="0.6"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <View
+        android:layout_width="6dp"
+        android:layout_height="6dp"
+        android:layout_marginStart="30dp"
+        android:layout_marginBottom="300dp"
+        android:background="@drawable/floating_dot"
+        android:alpha="0.4"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <View
+        android:layout_width="10dp"
+        android:layout_height="10dp"
+        android:layout_marginTop="300dp"
+        android:layout_marginEnd="80dp"
+        android:background="@drawable/floating_dot"
+        android:alpha="0.5"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
