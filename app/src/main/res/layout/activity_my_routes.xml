@@ -60,21 +60,7 @@
                 android:orientation="vertical"
                 android:gravity="center">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="24"
-                    android:textColor="@android:color/white"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Saved Routes"
-                    android:textColor="@android:color/white"
-                    android:textSize="12sp"
-                    android:alpha="0.8" />
 
             </LinearLayout>
 
@@ -91,21 +77,6 @@
                 android:orientation="vertical"
                 android:gravity="center">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="18"
-                    android:textColor="@android:color/white"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Liked Routes"
-                    android:textColor="@android:color/white"
-                    android:textSize="12sp"
-                    android:alpha="0.8" />
 
             </LinearLayout>
 
@@ -122,21 +93,7 @@
                 android:orientation="vertical"
                 android:gravity="center">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="156km"
-                    android:textColor="@android:color/white"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Total Distance"
-                    android:textColor="@android:color/white"
-                    android:textSize="12sp"
-                    android:alpha="0.8" />
 
             </LinearLayout>
 
