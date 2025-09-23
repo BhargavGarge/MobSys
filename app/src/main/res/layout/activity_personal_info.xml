@@ -248,95 +248,9 @@
                 android:orientation="horizontal"
                 android:layout_marginBottom="16dp">
 
-                <!-- Distance Card -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="120dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="@drawable/gradient_distance">
 
-                        <ImageView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:src="@drawable/ic_distance"
-                            app:tint="@android:color/white" />
 
-                        <TextView
-                            android:id="@+id/tv_total_distance"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="1,247 km"
-                            android:fontFamily="@font/seg_ui_semibold"
-                            android:textColor="@android:color/white"
-                            android:textSize="20sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="8dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Total Distance"
-                            android:fontFamily="@font/segoe_ui_regular"
-                            android:textColor="@android:color/white"
-                            android:textSize="12sp"
-                            android:layout_marginTop="4dp" />
-
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Tours Card -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="120dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="@drawable/gradient_tours">
-
-                        <ImageView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:src="@drawable/ic_route"
-                            app:tint="@android:color/white" />
-
-                        <TextView
-                            android:id="@+id/tv_total_tours"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="42"
-                            android:fontFamily="@font/seg_ui_semibold"
-                            android:textColor="@android:color/white"
-                            android:textSize="20sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="8dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Completed Tours"
-                            android:fontFamily="@font/segoe_ui_regular"
-                            android:textColor="@android:color/white"
-                            android:textSize="12sp"
-                            android:layout_marginTop="4dp" />
-
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
             </LinearLayout>
 
             <!-- Additional Stats Row -->
@@ -346,112 +260,27 @@
                 android:orientation="horizontal"
                 android:layout_marginBottom="24dp">
 
-                <!-- Elevation Card -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="@drawable/gradient_elevation">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_elevation"
-                            app:tint="@android:color/white" />
-
-                        <TextView
-                            android:id="@+id/tv_total_elevation"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="35,642 m"
-                            android:fontFamily="@font/seg_ui_semibold"
-                            android:textColor="@android:color/white"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="8dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Elevation Gain"
-                            android:fontFamily="@font/segoe_ui_regular"
-                            android:textColor="@android:color/white"
-                            android:textSize="10sp"
-                            android:layout_marginTop="4dp" />
-
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
 
                 <!-- Highlights Card -->
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="@drawable/gradient_highlights">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_highlight"
-                            app:tint="@android:color/white" />
-
-                        <TextView
-                            android:id="@+id/tv_highlights"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="127"
-                            android:fontFamily="@font/seg_ui_semibold"
-                            android:textColor="@android:color/white"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="8dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Highlights"
-                            android:fontFamily="@font/segoe_ui_regular"
-                            android:textColor="@android:color/white"
-                            android:textSize="10sp"
-                            android:layout_marginTop="4dp" />
-
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
             </LinearLayout>
 
-            <!-- Edit Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_edit_adventure_profile"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginBottom="32dp"
-                android:text="Edit Adventure Profile"
-                android:fontFamily="@font/segoe_ui_regular"
-                android:textAllCaps="false"
-                android:textSize="16sp"
-                app:icon="@drawable/ic_edit"
-                app:iconGravity="textStart"
-                app:iconPadding="8dp"
-                app:backgroundTint="#4CAF50"
-                style="@style/Widget.MaterialComponents.Button" />
+<!--            &lt;!&ndash; Edit Button &ndash;&gt;-->
+<!--            <com.google.android.material.button.MaterialButton-->
+<!--                android:id="@+id/btn_edit_adventure_profile"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="56dp"-->
+<!--                android:layout_marginBottom="32dp"-->
+<!--                android:text="Edit Adventure Profile"-->
+<!--                android:fontFamily="@font/segoe_ui_regular"-->
+<!--                android:textAllCaps="false"-->
+<!--                android:textSize="16sp"-->
+<!--                app:icon="@drawable/ic_edit"-->
+<!--                app:iconGravity="textStart"-->
+<!--                app:iconPadding="8dp"-->
+<!--                app:backgroundTint="#4CAF50"-->
+<!--                style="@style/Widget.MaterialComponents.Button" />-->
 
         </LinearLayout>
 
