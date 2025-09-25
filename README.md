@@ -83,11 +83,6 @@ My Routes: saved routes, liked routes, total distance covered
 
 ✔️ Custom View implemented (circular step progress bar)
 
-👨‍💻 Project Participant
-
-Name: Bhargav Garge
-
-Matriculation Number: 319933
 
 📂 Installation
 
